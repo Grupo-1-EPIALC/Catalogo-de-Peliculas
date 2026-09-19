@@ -89,3 +89,6 @@ una vez que las funciones que va a llamar ya existen).
 - [ ] Limpieza y transformacion adicional
 - [ ] Analisis / modelo
 - [ ] Conclusiones
+
+
+Escribo texto para probar mr por rama nueva
