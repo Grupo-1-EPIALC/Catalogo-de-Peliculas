@@ -222,3 +222,6 @@ __marimo__/
 Thumbs.db
 .vscode/
 .idea/
+
+# Datos generados / descargados (dataset crudo, JSON unificado)
+data/
