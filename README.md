@@ -79,6 +79,12 @@ Orden sugerido de implementacion: `crud.py` → `busqueda.py` → `estadisticas.
 → `rankings.py` → `recomendaciones.py`, y `main.py` al final (o en paralelo,
 una vez que las funciones que va a llamar ya existen).
 
+## Como contribuir
+
+Todo cambio va en una rama nueva a partir de `develop` (nunca commits directos a
+`develop` ni `main`) y se integra via Pull Request. Reglas detalladas para agentes de
+IA en [`CLAUDE.md`](CLAUDE.md).
+
 ## Estado / TODO
 
 - [x] Definir fuente de datos del catalogo (The Movies Dataset - Kaggle)
@@ -89,3 +95,13 @@ una vez que las funciones que va a llamar ya existen).
 - [ ] Limpieza y transformacion adicional
 - [ ] Analisis / modelo
 - [ ] Conclusiones
+
+
+El reparto queda asi:
+* Dario - crud.py
+* Elian - busqueda.py
+* Lucho - rankings.py
+* Leonardo - recomendaciones.py o main.py (de acuerdo a tu nivel)
+* Andres - estadisticas.py y main.py o recomendaciones.py
+
+### Recuerden que deberia estar subido al repo el jueves a la noche a mas tardar
