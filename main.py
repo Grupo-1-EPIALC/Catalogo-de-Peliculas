@@ -21,6 +21,8 @@ Funciones auxiliares (entrada/salida por consola):
 - _pedir_entero
 - _pedir_lista
 - _mostrar_resultado
+- _mostrar_listado_peliculas
+- _mostrar_detalle_peliculas
 - _ordenar_por_valor_desc
 """
 
@@ -185,6 +187,56 @@ def mostrar_menu(opciones: dict[int, str]) -> None:
 
 
 # Parametros:
+#   listado (list[dict]): resumenes de peliculas devueltos por busqueda.py con
+#       resumen=True (dicts con "id", "title", "anio" y "genres").
+# Retorna:
+#   None. Imprime una linea compacta por pelicula ("- Titulo (anio) [id: N]"),
+#       truncando a _LIMITE_RESULTADOS_MOSTRADOS como en _mostrar_resultado.
+#       El id permite ver la ficha completa despues (CRUD, opcion 1).
+def _mostrar_listado_peliculas(listado: list[dict]) -> None:
+    if not listado:
+        print("(sin resultado)")
+        return
+    for item in listado[:_LIMITE_RESULTADOS_MOSTRADOS]:
+        anio = f" ({item.get('anio')})" if item.get("anio") is not None else ""
+        print(f"- {item.get('title', item)}{anio} [id: {item.get('id')}]")
+    if len(listado) > _LIMITE_RESULTADOS_MOSTRADOS:
+        print(f"... y {len(listado) - _LIMITE_RESULTADOS_MOSTRADOS} peliculas mas.")
+
+
+# Parametros:
+#   peliculas (list[dict]): peliculas con su objeto completo (busqueda por
+#       titulo), para mostrar la ficha detallada de cada una.
+# Retorna:
+#   None. Imprime id, titulo, anio, generos, direccion, reparto (primeros 5),
+#       idioma, puntaje y sinopsis de cada pelicula, truncando a
+#       _LIMITE_RESULTADOS_MOSTRADOS fichas.
+def _mostrar_detalle_peliculas(peliculas: list[dict]) -> None:
+    if not peliculas:
+        print("(sin resultado)")
+        return
+    for pelicula in peliculas[:_LIMITE_RESULTADOS_MOSTRADOS]:
+        fecha = pelicula.get("release_date") or ""
+        anio = fecha[:4] if len(fecha) >= 4 and fecha[:4].isdigit() else "s/d"
+        generos = pelicula.get("genres") or []
+        directores = pelicula.get("directors") or []
+        reparto = pelicula.get("cast") or []
+        reparto_mostrado = ", ".join(reparto[:5])
+        if len(reparto) > 5:
+            reparto_mostrado += f" (y {len(reparto) - 5} mas)"
+        puntaje = pelicula.get("vote_average")
+        print(f"\n[{pelicula.get('id')}] {pelicula.get('title')} ({anio})")
+        print(f"Generos: {', '.join(generos) if generos else '-'}")
+        print(f"Direccion: {', '.join(directores) if directores else '-'}")
+        print(f"Reparto: {reparto_mostrado if reparto else '-'}")
+        print(f"Idioma original: {pelicula.get('original_language') or '-'}")
+        print(f"Puntaje: {puntaje if puntaje is not None else 's/d'}")
+        print(f"Sinopsis: {pelicula.get('overview') or '(sin sinopsis)'}")
+    if len(peliculas) > _LIMITE_RESULTADOS_MOSTRADOS:
+        print(f"... y {len(peliculas) - _LIMITE_RESULTADOS_MOSTRADOS} peliculas mas.")
+
+
+# Parametros:
 #   catalogo (list[dict]): catalogo de peliculas ya cargado en memoria.
 # Retorna:
 #   None. Este submenu solo consulta datos (busqueda.py), no modifica el catalogo.
@@ -198,18 +250,25 @@ def menu_busqueda(catalogo: list[dict]) -> None:
             return
         if opcion == 1:
             resultado = busqueda.buscar_por_titulo(catalogo, input("Titulo a buscar: "))
+            _mostrar_detalle_peliculas(resultado)
         elif opcion == 2:
-            resultado = busqueda.buscar_por_actor(catalogo, input("Nombre del actor: "))
+            resultado = busqueda.buscar_por_actor(catalogo, input("Nombre del actor: "), resumen=True)
+            _mostrar_listado_peliculas(resultado)
         elif opcion == 3:
-            resultado = busqueda.buscar_por_director(catalogo, input("Nombre del director: "))
+            resultado = busqueda.buscar_por_director(catalogo, input("Nombre del director: "), resumen=True)
+            _mostrar_listado_peliculas(resultado)
         elif opcion == 4:
-            resultado = busqueda.buscar_por_genero(catalogo, input("Genero: "))
+            resultado = busqueda.buscar_por_genero(catalogo, input("Genero: "), resumen=True)
+            _mostrar_listado_peliculas(resultado)
         elif opcion == 5:
-            resultado = busqueda.buscar_por_pais(catalogo, input("Pais: "))
+            resultado = busqueda.buscar_por_pais(catalogo, input("Pais: "), resumen=True)
+            _mostrar_listado_peliculas(resultado)
         elif opcion == 6:
-            resultado = busqueda.buscar_por_idioma(catalogo, input("Idioma: "))
+            resultado = busqueda.buscar_por_idioma(catalogo, input("Idioma: "), resumen=True)
+            _mostrar_listado_peliculas(resultado)
         elif opcion == 7:
-            resultado = busqueda.buscar_por_palabra_clave(catalogo, input("Palabra clave: "))
+            resultado = busqueda.buscar_por_palabra_clave(catalogo, input("Palabra clave: "), resumen=True)
+            _mostrar_listado_peliculas(resultado)
         elif opcion == 8:
             filtros = {
                 "titulo": input("Titulo (vacio para omitir): ") or None,
@@ -222,12 +281,10 @@ def menu_busqueda(catalogo: list[dict]) -> None:
                 "anio_desde": input("Anio desde (vacio para omitir): ") or None,
                 "anio_hasta": input("Anio hasta (vacio para omitir): ") or None,
             }
-            resultado = busqueda.busqueda_combinada(catalogo, filtros)
+            resultado = busqueda.busqueda_combinada(catalogo, filtros, resumen=True)
+            _mostrar_listado_peliculas(resultado)
         else:
             print("Opcion invalida.")
-            continue
-
-        _mostrar_resultado(resultado)
 
 
 # Parametros:

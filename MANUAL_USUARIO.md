@@ -75,16 +75,37 @@ encuentran coincidencias parciales. Por ejemplo, buscar por actor "hanks"
 encuentra a "Tom Hanks", y buscar género "comedia" no encontraría nada
 porque el dataset usa los nombres en inglés ("Comedy").
 
+La búsqueda **por título** muestra la ficha completa de cada película (id,
+título, año, géneros, dirección, reparto, idioma, puntaje y sinopsis). El
+resto de las búsquedas (incluida la combinada) muestran un listado compacto
+con título, año e **id**:
+
+```
+Opcion: 1
+Titulo a buscar: toy story
+
+[862] Toy Story (1995)
+Generos: Animation, Comedy, Family
+Direccion: John Lasseter
+Reparto: Tom Hanks, Tim Allen, Don Rickles, Jim Varney, Wallace Shawn (y 8 mas)
+Idioma original: en
+Puntaje: 7.7
+Sinopsis: Led by Woody, Andy's toys live happily in his room until ...
+```
+
 Ejemplo — buscar por actor:
 
 ```
 Opcion: 2
 Nombre del actor: tom hanks
-- Toy Story
-- Apollo 13
-- Forrest Gump
+- Toy Story (1995) [id: 862]
+- Apollo 13 (1995) [id: 568]
+- Forrest Gump (1994) [id: 13]
 ... y 51 peliculas mas.
 ```
+
+Anotá el `id` del listado: sirve para ver la ficha completa en el CRUD
+(opción 2 del menú principal, "Ver pelicula por id").
 
 Si hay más de 20 resultados, se muestran los primeros 20 y un aviso de
 cuántos quedaron afuera (para no inundar la pantalla).

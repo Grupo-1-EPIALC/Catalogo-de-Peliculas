@@ -41,3 +41,17 @@ Se reviso la PR 5 con `gh pr view` y la API: el diff de codigo estaba sano, pero
 **Si fue modificado o rechazado:** sin modificaciones.
 
 **Cómo se comprobó que funciona:** se volvio a descargar el cuerpo via API y se inspecciono por script: 74 backticks, 0 caracteres de control, 0 `U+FFFD` (los 2 backslashes restantes son el path intencional `.venv\Scripts\activate`). Visualmente verificado con `gh pr view 5`.
+
+## Entrada 4 — 2026-09-25
+
+**Prompt del usuario:**
+> Corregir busqueda.py: la busqueda por titulo debe devolver todo el objeto de la pelicula (id, descripcion, genero, año, etc.); las demas busquedas (actor, director, genero, pais, idioma, palabra clave, combinada) solo un listado. Revisar CLAUDE.md, main.py, crud.py, GUIA_TP.md y manual_usuario.md para contexto.
+
+**Respuesta / propuesta de la IA:**
+Se leyo el contexto nuevo (main.py reescrito con submenus, MANUAL_USUARIO.md, tests/, recomendaciones.py implementado). Hallazgo clave: `recomendaciones.py` consume `buscar_por_genero/_director/_actor/_idioma` y necesita objetos completos (lee `id`, `genres`, `cast`, `vote_average`, etc.), asi que cambiar el retorno rompia otro modulo. Se pregunto al usuario y se acordo: flag opt-in `resumen=False` por defecto + `resumir_pelicula()` que devuelve `{"id", "title", "anio", "genres"}`; `main.py` pide `resumen=True` en todo salvo titulo y muestra ficha detallada vs listado `- Titulo (anio) [id: N]`. Se actualizaron MANUAL_USUARIO.md (seccion 3) y se agregaron 15 tests (8 en test_busqueda.py, 7 en test_main.py).
+
+**Decisión del usuario:** Aceptado
+
+**Si fue modificado o rechazado:** el usuario eligio las opciones recomendadas (flag opt-in y listado id + titulo + anio + generos). Sin cambios al diseño.
+
+**Cómo se comprobó que funciona:** `pytest tests/test_busqueda.py tests/test_main.py`: 64/64 OK (incluye 15 nuevos; los existentes siguen pasando sin tocarlos, prueba de que no hubo rotura). Suite completa: 112 passed, 11 skipped; 7 errores preexistentes en tests de estadisticas/recomendaciones por fixture `catalogo_real` sin decorador (archivos de otros modulos, no tocados). Script temporal contra `data/movies_unified_sample.json` (1000 peliculas): titulo devuelve objetos de 22 claves, actor resumido 6 items de 4 claves, combinada resumida 3 items, y `recomendar_por_ranking` sigue devolviendo objetos completos.
