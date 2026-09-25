@@ -55,3 +55,17 @@ Se leyo el contexto nuevo (main.py reescrito con submenus, MANUAL_USUARIO.md, te
 **Si fue modificado o rechazado:** el usuario eligio las opciones recomendadas (flag opt-in y listado id + titulo + anio + generos). Sin cambios al diseño.
 
 **Cómo se comprobó que funciona:** `pytest tests/test_busqueda.py tests/test_main.py`: 64/64 OK (incluye 15 nuevos; los existentes siguen pasando sin tocarlos, prueba de que no hubo rotura). Suite completa: 112 passed, 11 skipped; 7 errores preexistentes en tests de estadisticas/recomendaciones por fixture `catalogo_real` sin decorador (archivos de otros modulos, no tocados). Script temporal contra `data/movies_unified_sample.json` (1000 peliculas): titulo devuelve objetos de 22 claves, actor resumido 6 items de 4 claves, combinada resumida 3 items, y `recomendar_por_ranking` sigue devolviendo objetos completos.
+
+## Entrada 5 — 2026-09-25
+
+**Prompt del usuario:**
+> Nosotros solo debemos tocar busqueda.py, nada mas. Lo mejor es que el catalogo consuma el json completo, creo que mis compañeros estan haciendo eso, no solo el sample. Revisa por las dudas.
+
+**Respuesta / propuesta de la IA:**
+Se verifico que `main.py` carga `data/movies_unified.json` (el catalogo completo, ~67 MB / 45433 peliculas), no el sample: el sample solo se uso para verificaciones rapidas (mismo esquema). Y se recorto la rama `feature/busqueda-formato-resultados` a solo `busqueda.py` (+ este registro): se revertieron los cambios de `main.py`, `MANUAL_USUARIO.md`, `tests/test_busqueda.py` y `tests/test_main.py` a su version de `develop`, ya que son archivos de otros integrantes. Como el flag `resumen` es opt-in con default `False`, el `main.py` actual sigue funcionando igual sin cambios.
+
+**Decisión del usuario:** Aceptado
+
+**Si fue modificado o rechazado:** sin modificaciones.
+
+**Cómo se comprobó que funciona:** script temporal contra el JSON completo (45433 peliculas): titulo "toy story" devuelve objetos completos (Toy Story, Toy Story 2, Toy Story 3, 22 claves), actor "tom hanks" con resumen devuelve 71 listados `{'id': 862, ...}`, y la combinada Comedy + Tom Hanks + 1990-2000 con resumen devuelve 9. `git status` confirma que la rama solo modifica `busqueda.py` y `registro_ia/registro_Elian.md`.
