@@ -69,3 +69,17 @@ Se verifico que `main.py` carga `data/movies_unified.json` (el catalogo completo
 **Si fue modificado o rechazado:** sin modificaciones.
 
 **Cómo se comprobó que funciona:** script temporal contra el JSON completo (45433 peliculas): titulo "toy story" devuelve objetos completos (Toy Story, Toy Story 2, Toy Story 3, 22 claves), actor "tom hanks" con resumen devuelve 71 listados `{'id': 862, ...}`, y la combinada Comedy + Tom Hanks + 1990-2000 con resumen devuelve 9. `git status` confirma que la rama solo modifica `busqueda.py` y `registro_ia/registro_Elian.md`.
+
+## Entrada 6 — 2026-09-25
+
+**Prompt del usuario:**
+> Por que hubo que crear resumir_pelicula en vez de reutilizar la funcion que ya teniamos? Y: que tests fallaban que tuviste que retirar? Mejor dejarlos con un comentario de que hay que refactorizarlos. Tambien: con que comando ejecuto pruebas manuales de la busqueda?
+
+**Respuesta / propuesta de la IA:**
+Se explico que ninguna funcion existente resumia (todas devolvian el objeto completo) y que el helper evita repetir la proyeccion en 8 funciones + combinada (mismo patron DRY que `_normalizar`/`_anio_estreno`). Se aclaro que ningun test del equipo fallo jamas: los 7 retirados eran tests nuevos propios que probaban helpers de `main.py` revertidos. Se repusieron en `tests/test_main.py` con `@pytest.mark.skip` + comentario de refactor pendiente del cableado de `resumen=True` en `menu_busqueda`. Se indico el comando manual: `python main.py` (app completa) y REPL con `busqueda.py` para el flag `resumen`.
+
+**Decisión del usuario:** Aceptado
+
+**Si fue modificado o rechazado:** sin modificaciones.
+
+**Cómo se comprobó que funciona:** `pytest tests/test_busqueda.py tests/test_main.py`: 57 passed, 7 skipped (los 7 salteados a proposito, suite en verde).
