@@ -1,0 +1,4 @@
+{
+  "version": "0.0.5",
+  "description": "Implementación de rankings de películas por puntuación, con filtros por género, actor y director. Los promedios por categoría ignoran puntuaciones inválidas y se muestran con dos decimales."
+}
