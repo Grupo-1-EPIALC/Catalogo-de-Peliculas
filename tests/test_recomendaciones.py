@@ -97,8 +97,9 @@ class TestCrearPerfilUsuario:
 
 
 class TestCalcularAfinidad:
-    """calcular_afinidad no llama a busqueda.py (solo compara sets sobre los
-    dicts recibidos), asi que no necesita el fixture de mocking."""
+    """calcular_afinidad no llama a busqueda.py (usa su propia comparacion
+    normalizada, ver TestComparacionNormalizada), asi que no necesita el
+    fixture de mocking."""
 
     def test_afinidad_con_varias_coincidencias(self, catalogo_recomendaciones, perfil):
         # peli 1: genero Animation + actor ActorX + idioma English = 3
@@ -113,6 +114,29 @@ class TestCalcularAfinidad:
     def test_afinidad_sin_coincidencias(self, catalogo_recomendaciones, perfil):
         afinidad = recomendaciones.calcular_afinidad(catalogo_recomendaciones[3], perfil)
         assert afinidad == 0
+
+
+class TestComparacionNormalizada:
+    """Regresion de un bug real: calcular_afinidad (y el promedio historico
+    dentro de recomendar_por_ranking) comparaban strings exactos, mientras
+    que busqueda.py -y por lo tanto filtrar_peliculas_por_gustos- matchean
+    sin importar mayusculas/tildes. Una pelicula que filtrar_peliculas_por_
+    gustos encontraba (ej. porque el usuario escribio "tom hanks" en
+    minuscula) terminaba con afinidad 0 porque "tom hanks" != "Tom Hanks"."""
+
+    def test_afinidad_ignora_mayusculas(self, catalogo_recomendaciones):
+        perfil = recomendaciones.crear_perfil_usuario("Andres", ["animation"], [], [], [])
+        assert recomendaciones.calcular_afinidad(catalogo_recomendaciones[0], perfil) == 1
+
+    def test_afinidad_ignora_tildes(self):
+        pelicula = {"id": 1, "genres": [], "directors": [], "cast": ["José Rodríguez"], "spoken_languages": []}
+        perfil = recomendaciones.crear_perfil_usuario("Andres", [], [], ["jose rodriguez"], [])
+        assert recomendaciones.calcular_afinidad(pelicula, perfil) == 1
+
+    def test_preferencia_sin_relacion_no_matchea_por_substring_vacio(self, catalogo_recomendaciones):
+        # una preferencia vacia/solo espacios no debe "matchear todo"
+        perfil = recomendaciones.crear_perfil_usuario("Andres", ["   "], [], [], [])
+        assert recomendaciones.calcular_afinidad(catalogo_recomendaciones[0], perfil) == 0
 
 
 class TestFiltrarPeliculasPorGustos:
@@ -195,3 +219,18 @@ class TestFuncionalConBusquedaYDatasetReales:
     def test_genero_inexistente_no_rompe(self, catalogo_real):
         perfil = recomendaciones.crear_perfil_usuario("Nadie", ["GeneroQueNoExiste"], [], [], [])
         assert recomendaciones.recomendar_por_ranking(catalogo_real, perfil, "vote_average", 3) == []
+
+    def test_preferencias_con_distinta_capitalizacion_siguen_matcheando(self, catalogo_real):
+        # regresion: el usuario rara vez tipea el nombre exacto tal como esta
+        # en el dataset (ej. "Tom Hanks"); antes del fix, esto hacia que
+        # calcular_afinidad devolviera 0 aunque la pelicula fuera un match real
+        perfil = recomendaciones.crear_perfil_usuario(
+            "Andres",
+            generos_preferidos=["animation"],
+            directores_preferidos=["john lasseter"],
+            actores_preferidos=["tom hanks"],
+            idiomas_preferidos=["ENGLISH"],
+        )
+        top = recomendaciones.recomendar_por_ranking(catalogo_real, perfil, "vote_average", 5)
+        assert len(top) == 5
+        assert all(recomendaciones.calcular_afinidad(p, perfil) >= 1 for p in top)

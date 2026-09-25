@@ -248,32 +248,42 @@ def menu_crud(catalogo: list[dict]) -> list[dict]:
             id_pelicula = _pedir_entero("Id de la pelicula: ")
             _mostrar_resultado(crud.obtener_pelicula_por_id(catalogo, id_pelicula))
             continue
-        if opcion == 2:
-            nueva_pelicula = {
-                "id": _pedir_entero("Id de la nueva pelicula: "),
-                "title": input("Titulo: "),
-            }
-            catalogo = crud.crear_pelicula(catalogo, nueva_pelicula)
-        elif opcion == 3:
-            id_pelicula = _pedir_entero("Id de la pelicula a editar: ")
-            campo = input("Campo a modificar (ej. title, vote_average, tagline): ")
-            valor = input("Nuevo valor: ")
-            catalogo = crud.actualizar_pelicula(catalogo, id_pelicula, {campo: valor})
-        elif opcion == 4:
-            id_pelicula = _pedir_entero("Id de la pelicula a eliminar: ")
-            catalogo = crud.eliminar_pelicula(catalogo, id_pelicula)
-        elif opcion == 5:
-            id_pelicula = _pedir_entero("Id de la pelicula: ")
-            campo_lista = input("Campo tipo lista (genres, cast, directors, keywords, production_companies, production_countries, spoken_languages): ")
-            valor = input("Valor a agregar: ")
-            catalogo = crud.agregar_valor_a_lista(catalogo, id_pelicula, campo_lista, valor)
-        elif opcion == 6:
-            id_pelicula = _pedir_entero("Id de la pelicula: ")
-            campo_lista = input("Campo tipo lista (genres, cast, directors, keywords, production_companies, production_countries, spoken_languages): ")
-            valor = input("Valor a quitar: ")
-            catalogo = crud.quitar_valor_de_lista(catalogo, id_pelicula, campo_lista, valor)
-        else:
-            print("Opcion invalida.")
+
+        # Las operaciones que modifican el catalogo (2 a 6) pueden fallar por
+        # motivos esperables del usuario (id duplicado, id inexistente, campo
+        # de lista invalido, valor no presente): crud.py las señala con
+        # ValueError. Sin este try/except, cualquiera de esos casos tumbaba
+        # toda la aplicacion.
+        try:
+            if opcion == 2:
+                nueva_pelicula = {
+                    "id": _pedir_entero("Id de la nueva pelicula: "),
+                    "title": input("Titulo: "),
+                }
+                catalogo = crud.crear_pelicula(catalogo, nueva_pelicula)
+            elif opcion == 3:
+                id_pelicula = _pedir_entero("Id de la pelicula a editar: ")
+                campo = input("Campo a modificar (ej. title, vote_average, tagline): ")
+                valor = input("Nuevo valor: ")
+                catalogo = crud.actualizar_pelicula(catalogo, id_pelicula, {campo: valor})
+            elif opcion == 4:
+                id_pelicula = _pedir_entero("Id de la pelicula a eliminar: ")
+                catalogo = crud.eliminar_pelicula(catalogo, id_pelicula)
+            elif opcion == 5:
+                id_pelicula = _pedir_entero("Id de la pelicula: ")
+                campo_lista = input("Campo tipo lista (genres, cast, directors, keywords, production_companies, production_countries, spoken_languages): ")
+                valor = input("Valor a agregar: ")
+                catalogo = crud.agregar_valor_a_lista(catalogo, id_pelicula, campo_lista, valor)
+            elif opcion == 6:
+                id_pelicula = _pedir_entero("Id de la pelicula: ")
+                campo_lista = input("Campo tipo lista (genres, cast, directors, keywords, production_companies, production_countries, spoken_languages): ")
+                valor = input("Valor a quitar: ")
+                catalogo = crud.quitar_valor_de_lista(catalogo, id_pelicula, campo_lista, valor)
+            else:
+                print("Opcion invalida.")
+                continue
+        except ValueError as error:
+            print(f"No se pudo completar la operacion: {error}")
             continue
 
         crud.guardar_catalogo(catalogo, RUTA_DATOS)

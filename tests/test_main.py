@@ -152,3 +152,62 @@ class TestMenuEstadisticasFuncional:
         main.menu_estadisticas(catalogo)
 
         assert "Opcion invalida." in capsys.readouterr().out
+
+
+class TestMenuCrudFuncional:
+    """menu_crud contra crud.py real: crud.py levanta ValueError ante id
+    duplicado/inexistente, campo de lista invalido, etc. Estos tests son
+    regresion de un bug real: antes de agregar el try/except en menu_crud,
+    cualquiera de estos casos (perfectamente esperables por un uso normal)
+    tumbaba toda la aplicacion con una excepcion sin capturar."""
+
+    @pytest.fixture
+    def catalogo(self) -> list[dict]:
+        return [{"id": 1, "title": "Existente", "genres": ["Drama"]}]
+
+    def test_id_duplicado_al_crear_no_rompe_y_no_modifica_el_catalogo(self, catalogo, monkeypatch, capsys):
+        respuestas = iter(["2", "1", "Titulo Duplicado", "0"])
+        monkeypatch.setattr(builtins, "input", lambda _: next(respuestas))
+
+        resultado = main.menu_crud(catalogo)
+
+        assert len(resultado) == 1
+        assert "No se pudo completar la operacion" in capsys.readouterr().out
+
+    def test_id_inexistente_al_editar_no_rompe(self, catalogo, monkeypatch, capsys):
+        respuestas = iter(["3", "9999", "title", "Nuevo Titulo", "0"])
+        monkeypatch.setattr(builtins, "input", lambda _: next(respuestas))
+
+        resultado = main.menu_crud(catalogo)
+
+        assert resultado[0]["title"] == "Existente"
+        assert "No se pudo completar la operacion" in capsys.readouterr().out
+
+    def test_id_inexistente_al_eliminar_no_rompe(self, catalogo, monkeypatch, capsys):
+        respuestas = iter(["4", "9999", "0"])
+        monkeypatch.setattr(builtins, "input", lambda _: next(respuestas))
+
+        resultado = main.menu_crud(catalogo)
+
+        assert len(resultado) == 1
+        assert "No se pudo completar la operacion" in capsys.readouterr().out
+
+    def test_campo_lista_invalido_no_rompe(self, catalogo, monkeypatch, capsys):
+        respuestas = iter(["5", "1", "title", "no es una lista", "0"])
+        monkeypatch.setattr(builtins, "input", lambda _: next(respuestas))
+
+        main.menu_crud(catalogo)
+
+        assert "No se pudo completar la operacion" in capsys.readouterr().out
+
+    def test_operacion_valida_sigue_funcionando(self, catalogo, monkeypatch, tmp_path):
+        # RUTA_DATOS apunta a un archivo temporal para no pisar data/movies_unified.json;
+        # monkeypatch restaura el valor original solo al terminar el test.
+        monkeypatch.setattr(main, "RUTA_DATOS", str(tmp_path / "catalogo_test.json"))
+        respuestas = iter(["2", "2", "Pelicula Nueva", "0"])
+        monkeypatch.setattr(builtins, "input", lambda _: next(respuestas))
+
+        resultado = main.menu_crud(catalogo)
+
+        assert len(resultado) == 2
+        assert any(p["id"] == 2 and p["title"] == "Pelicula Nueva" for p in resultado)
