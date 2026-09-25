@@ -83,3 +83,17 @@ Se explico que ninguna funcion existente resumia (todas devolvian el objeto comp
 **Si fue modificado o rechazado:** sin modificaciones.
 
 **Cómo se comprobó que funciona:** `pytest tests/test_busqueda.py tests/test_main.py`: 57 passed, 7 skipped (los 7 salteados a proposito, suite en verde).
+
+## Entrada 7 — 2026-09-25
+
+**Prompt del usuario:**
+> Creame el jupyter notebook para probar mi motor de busqueda, que no se va a subir al repo, es solo para nosotros.
+
+**Respuesta / propuesta de la IA:**
+Se creo `prueba_busqueda.ipynb` en la raiz (13 celdas: carga del catalogo completo con fallback al sample, titulo→objeto completo, listados con `resumen=True` por actor/director/genero/pais/idioma/keyword, combinada con tiempos, compatibilidad hacia atras y casos borde). Se ejecuto con `nbclient` en el `.venv` contra las 45433 peliculas y quedo guardado con outputs reales, sin errores. Para que no se suba jamas, se excluyo en `.git/info/exclude` (local, sin tocar archivos versionados): `git status` no lo muestra y `git check-ignore` lo confirma.
+
+**Decisión del usuario:** Aceptado
+
+**Si fue modificado o rechazado:** sin modificaciones.
+
+**Cómo se comprobó que funciona:** el notebook se ejecuto de punta a punta por script (todas las celdas de codigo con outputs y ningun `error`); ademas se verifico el ignore con `git check-ignore -v`.
