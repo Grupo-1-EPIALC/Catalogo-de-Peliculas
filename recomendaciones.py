@@ -22,9 +22,12 @@ Funciones que contiene:
 
 Funciones auxiliares (uso interno del modulo):
 - _valor_numerico
+- _normalizar
+- _preferencia_coincide_con_valor
 """
 
 import random
+import unicodedata
 from typing import Callable
 
 import busqueda
@@ -66,6 +69,34 @@ def _valor_numerico(pelicula: dict, campo: str) -> float | None:
         return float(valor)
     except (TypeError, ValueError):
         return None
+
+
+# Parametros:
+#   texto (str): texto a normalizar.
+# Retorna:
+#   str: el texto en minusculas, sin tildes/diacriticos y sin espacios en
+#       las puntas. Misma normalizacion que usa busqueda.py (duplicada aca a
+#       proposito, en vez de importar el helper privado de otro modulo).
+def _normalizar(texto: str) -> str:
+    descompuesto = unicodedata.normalize("NFD", str(texto).strip().casefold())
+    return "".join(letra for letra in descompuesto if unicodedata.category(letra) != "Mn")
+
+
+# Parametros:
+#   preferencia (str): un genero/director/actor/idioma preferido por el usuario.
+#   valor_pelicula (str): el valor correspondiente de una pelicula.
+# Retorna:
+#   bool: True si la preferencia aparece (normalizada, sin importar mayusculas
+#       ni tildes) dentro del valor de la pelicula. Usa la misma logica de
+#       coincidencia que busqueda.py, para que una pelicula encontrada por
+#       filtrar_peliculas_por_gustos nunca de afinidad 0 con la preferencia
+#       que la hizo coincidir (ej. el usuario escribe "tom hanks" y la
+#       pelicula tiene "Tom Hanks").
+def _preferencia_coincide_con_valor(preferencia: str, valor_pelicula: str) -> bool:
+    preferencia_norm = _normalizar(preferencia)
+    if not preferencia_norm:
+        return False
+    return preferencia_norm in _normalizar(valor_pelicula)
 
 
 # Parametros:
@@ -118,13 +149,19 @@ def filtrar_peliculas_por_gustos(catalogo: list[dict], perfil_usuario: dict) -> 
 #   perfil_usuario (dict): perfil generado con crear_perfil_usuario.
 # Retorna:
 #   int: cantidad de coincidencias entre la pelicula y los gustos del usuario
-#       (suma de generos, directores, actores e idiomas en comun).
+#       (suma de generos, directores, actores e idiomas en comun). La
+#       comparacion es normalizada (sin importar mayusculas ni tildes), igual
+#       que busqueda.py, para ser consistente con filtrar_peliculas_por_gustos.
 def calcular_afinidad(pelicula: dict, perfil_usuario: dict) -> int:
     afinidad = 0
     for clave_perfil, (campo_pelicula, _, _) in CAMPOS_PREFERENCIA.items():
-        preferencias = set(perfil_usuario.get(clave_perfil) or [])
-        valores_pelicula = set(pelicula.get(campo_pelicula) or [])
-        afinidad += len(preferencias & valores_pelicula)
+        valores_pelicula = pelicula.get(campo_pelicula) or []
+        preferencias = perfil_usuario.get(clave_perfil) or []
+        afinidad += sum(
+            1
+            for preferencia in preferencias
+            if any(_preferencia_coincide_con_valor(preferencia, valor) for valor in valores_pelicula)
+        )
     return afinidad
 
 
@@ -159,10 +196,12 @@ def recomendar_por_ranking(catalogo: list[dict], perfil_usuario: dict, campo_pun
 
         valores_historicos = []
         for clave_perfil, (campo_pelicula, _, _) in CAMPOS_PREFERENCIA.items():
-            preferencias = set(perfil_usuario.get(clave_perfil) or [])
+            preferencias = perfil_usuario.get(clave_perfil) or []
             promedios = promedios_por_categoria[clave_perfil]
             for valor in pelicula.get(campo_pelicula) or []:
-                if valor in preferencias and valor in promedios:
+                if valor in promedios and any(
+                    _preferencia_coincide_con_valor(preferencia, valor) for preferencia in preferencias
+                ):
                     valores_historicos.append(promedios[valor])
 
         if valores_historicos:

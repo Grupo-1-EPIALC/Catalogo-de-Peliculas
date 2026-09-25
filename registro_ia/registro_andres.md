@@ -307,3 +307,133 @@ modulo:
    (`git status` confirmo que quedaron sin cambios).
 4. Se agrego una seccion "Tests" al `README.md` explicando como correrlos y
    el comportamiento de auto-skip, y se actualizo el TODO.
+
+---
+
+### Entrada 8 — 2026-09-25
+
+**Prompt del usuario:**
+> volve a revisar el menu y las pruebas con los cambios, ejecuta luego las
+> pruebas
+
+**Contexto:** el usuario mergeo a `develop` las 3 ramas pendientes
+(`feature/implementacion-crud`, `feature/busqueda-peliculas`,
+`feature/estadisticas-y-menu`, PRs #5, #6 y #7). `crud.py` y `busqueda.py`
+pasaron de ser stubs a implementaciones reales en el working tree.
+
+**Respuesta / propuesta de la IA:**
+1. Se corrio la suite completa contra el `develop` ya mergeado: **95 passed,
+   11 skipped** (los 11 salteados son todos de `rankings.py`, el unico modulo
+   que sigue sin implementar). Los tests que antes dependian de `crud.py`/
+   `busqueda.py` reales empezaron a correr solos, sin tocar nada, tal como
+   estaban pensados.
+2. Revisando el menu con `crud.py` ya real (antes stub), se encontro un bug
+   real: `crud.py` levanta `ValueError` a proposito ante casos esperables
+   (id duplicado al crear, id inexistente al editar/eliminar/modificar una
+   lista, campo de lista invalido), pero `menu_crud` en `main.py` no tenia
+   ningun `try/except` alrededor de esas llamadas. Se reprodujo el crash con
+   un script manual (id duplicado tumbaba toda la aplicacion con un
+   traceback). Se agrego un `try/except ValueError` alrededor de las
+   opciones 2 a 6 de `menu_crud`, que imprime un mensaje claro
+   ("No se pudo completar la operacion: ...") y vuelve al menu sin persistir
+   nada cuando la operacion falla.
+3. Se agregaron 5 tests de regresion en `test_main.py`
+   (`TestMenuCrudFuncional`) cubriendo id duplicado, id inexistente al
+   editar/eliminar, campo de lista invalido, y que el camino valido siga
+   funcionando. Como `crud.py` ya es real (no stub), estos tests corren
+   siempre, sin skip.
+
+**Decision del usuario:** Pendiente de confirmacion (se aplico el fix
+directamente porque era un bug de crash claro, pero el usuario todavia no
+lo reviso).
+
+**Como se comprobo que funciona:**
+1. Se reprodujo el bug original con un script manual antes de arreglarlo
+   (confirmando el `ValueError` sin capturar).
+2. Despues del fix, se volvio a correr el mismo script: id duplicado al
+   crear, id inexistente al eliminar, y una operacion valida (agregar
+   pelicula) — los tres casos funcionaron como se esperaba (mensaje de
+   error prolijo en los dos primeros, alta exitosa en el tercero).
+3. Suite completa final: **100 passed, 11 skipped**.
+
+**Incidente durante la verificacion (y como se resolvio):** el script manual
+usado para reproducir el bug (paso 1) no parcheaba `RUTA_DATOS`, asi que al
+probar el caso "operacion valida" (agregar una pelicula) el `main.py` llamo
+a `crud.guardar_catalogo` con la ruta real y **sobreescribio
+`data/movies_unified.json`** con el catalogo de prueba de 1-2 peliculas,
+perdiendo localmente las 45.433 peliculas reales. Se detecto de inmediato
+(`data/` no esta versionada, asi que git no protegia este archivo) y se
+regenero corriendo el mismo pipeline que usa `eda dataset.ipynb`
+(kagglehub ya tenia el dataset cacheado localmente, no hizo falta
+redescargar). Se confirmo la restauracion completa (45.433 peliculas) antes
+de dar el trabajo por terminado. Los tests nuevos que sí necesitan escribir
+un catalogo via `crud.guardar_catalogo` (`test_operacion_valida_sigue_
+funcionando`) ahora usan `monkeypatch.setattr(main, "RUTA_DATOS", ...)`
+apuntando a `tmp_path` para que esto no pueda volver a pasar.
+
+**Nota de proceso:** el fix se hizo estando parado en `develop` (recien
+actualizado por el merge de los PRs). Siguiendo el guardrail de `CLAUDE.md`,
+se creo la rama `fix/crud-value-error-en-menu` antes de dejar el cambio, en
+vez de commitear directo a `develop`.
+
+---
+
+### Entrada 9 — 2026-09-25
+
+**Prompt del usuario:**
+> revisa si en recomendaciones hay que cambiar algo con el nuevo codigo
+
+**Contexto:** el usuario tenia abierto `busqueda.py` en el editor; pregunta
+si `recomendaciones.py` sigue siendo correcto ahora que `busqueda.py` dejo
+de ser un stub y paso a tener la implementacion real (matching normalizado:
+sin importar mayusculas ni tildes, por substring).
+
+**Respuesta / propuesta de la IA:**
+Se encontro una inconsistencia real: `filtrar_peliculas_por_gustos` delega
+en `busqueda.py`, que matchea de forma normalizada (case/tilde-insensible,
+por substring). Pero `calcular_afinidad` y el calculo de promedio historico
+dentro de `recomendar_por_ranking` comparaban los strings del perfil contra
+los de la pelicula con interseccion de sets exacta (`==` estricto). Se
+reprodujo el bug: un perfil con actor `"tom hanks"` (minuscula) hacia que
+`filtrar_peliculas_por_gustos` encontrara correctamente "Toy Story" (via
+busqueda.py), pero `calcular_afinidad` sobre esa misma pelicula devolvia 0
+en vez de 1, porque `"tom hanks" != "Tom Hanks"` en comparacion exacta. Esto
+distorsiona el orden de `recomendar_por_ranking` (afinidad y promedio
+historico ambos subestimados) para cualquier preferencia que el usuario no
+tipee con la capitalizacion/acentuacion exacta del dataset — el caso normal
+de uso.
+
+Fix: se agregaron dos helpers privados en `recomendaciones.py`
+(`_normalizar`, duplicando la logica de `busqueda._normalizar` en vez de
+importar el simbolo privado de otro modulo; y `_preferencia_coincide_con_
+valor`), y se reescribieron `calcular_afinidad` y la parte de promedio
+historico de `recomendar_por_ranking` para usar esa comparacion normalizada
+en vez de interseccion de sets exacta.
+
+**Decision del usuario:** Pendiente de confirmacion (se aplico el fix
+directamente por ser un bug de correctitud claro y verificable; el usuario
+todavia no lo reviso).
+
+**Como se comprobo que funciona:**
+1. Se reprodujo el bug con un script chico antes del fix (afinidad 0 para
+   "tom hanks" vs "Tom Hanks") y se confirmo que quedaba en 1 despues del fix,
+   probando tambien mayusculas (`"ANIMATION"`) y un caso sin relacion real
+   (`afinidad == 0`).
+2. Se agregaron tests unitarios nuevos en `test_recomendaciones.py`
+   (`TestComparacionNormalizada`): ignora mayusculas, ignora tildes, y una
+   preferencia vacia/solo espacios no matchea todo (evita que un substring
+   vacio genere falsos positivos).
+3. Se agrego un test funcional nuevo contra el dataset real de 45.433
+   peliculas, con un perfil escrito deliberadamente con capitalizacion
+   distinta a la del dataset (`"animation"`, `"john lasseter"`, `"tom
+   hanks"`, `"ENGLISH"`), verificando que las 5 peliculas recomendadas
+   tengan afinidad >= 1 (antes del fix, este test hubiera fallado).
+4. Suite completa del repo: **104 passed, 11 skipped** (los 11 siguen siendo
+   solo de `rankings.py`). Se confirmo ademas que `data/movies_unified.json`
+   seguia intacto (45.433 peliculas) despues de correr todo, con mas cuidado
+   que en la Entrada 8.
+
+**Nota de proceso:** el cambio se agrego en la misma rama
+`fix/crud-value-error-en-menu` (ya tenia el fix de `menu_crud` sin
+commitear), en vez de crear una rama nueva, porque el usuario todavia no
+habia commiteado ese trabajo previo.
