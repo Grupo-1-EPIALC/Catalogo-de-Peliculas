@@ -6,6 +6,9 @@ ver estructura en `crud.py`). Todas reciben el catalogo ya cargado en memoria
 (con `crud.cargar_catalogo`) y devuelven un subconjunto de peliculas que
 cumplen el criterio pedido.
 
+Las comparaciones de texto ignoran mayusculas/minusculas, tildes y espacios
+extra. Un criterio vacio (solo espacios) no coincide con nada y devuelve [].
+
 Funciones que contiene:
 - buscar_por_titulo
 - buscar_por_actor
@@ -20,17 +23,35 @@ Funciones que contiene:
 import unicodedata
 
 
-# Normaliza un texto para que las comparaciones sean insensibles a
-# mayusculas/minusculas, tildes y espacios extra. Ej. " Acción " -> "accion".
-# Es un helper privado (no es parte de la API publica del modulo).
 def _normalizar(texto: str) -> str:
+    """Normaliza un texto para comparaciones insensibles a forma.
+
+    Quita espacios de los extremos, pasa a minusculas y elimina tildes
+    (descomposicion Unicode NFD). Ejemplo: ``" Acción "`` -> ``"accion"``.
+
+    Es un helper privado (no forma parte de la API publica del modulo).
+
+    Parametros:
+        texto (str): texto a normalizar. Si no es str, se convierte con ``str()``.
+
+    Retorna:
+        str: texto normalizado, listo para comparar con ``in`` o ``==``.
+    """
     descompuesto = unicodedata.normalize("NFD", str(texto).strip().casefold())
     return "".join(letra for letra in descompuesto if unicodedata.category(letra) != "Mn")
 
 
-# Extrae el anio de estreno desde "release_date" (formato "YYYY-MM-DD").
-# Devuelve None si la fecha falta o no empieza con un anio valido.
 def _anio_estreno(pelicula: dict) -> int | None:
+    """Obtiene el anio de estreno a partir de ``release_date``.
+
+    Parametros:
+        pelicula (dict): pelicula del catalogo. Se espera ``release_date``
+            en formato ``"YYYY-MM-DD"`` (o al menos los cuatro digitos del anio).
+
+    Retorna:
+        int | None: anio de estreno, o ``None`` si la fecha falta, no es str
+            o los primeros cuatro caracteres no son un entero valido.
+    """
     fecha = pelicula.get("release_date")
     if not isinstance(fecha, str) or len(fecha.strip()) < 4:
         return None
@@ -40,13 +61,20 @@ def _anio_estreno(pelicula: dict) -> int | None:
         return None
 
 
-# Parametros:
-#   catalogo (list[dict]): lista de peliculas del catalogo.
-#   texto (str): texto (o parte del texto) a buscar en el titulo. Busqueda
-#       insensible a mayusculas/minusculas.
-# Retorna:
-#   list[dict]: peliculas cuyo "title" u "original_title" contienen el texto.
 def buscar_por_titulo(catalogo: list[dict], texto: str) -> list[dict]:
+    """Busca peliculas cuyo titulo contiene el texto indicado.
+
+    Coincide si ``texto`` aparece en ``title`` o en ``original_title``
+    (coincidencia parcial).
+
+    Parametros:
+        catalogo (list[dict]): lista de peliculas del catalogo.
+        texto (str): texto (o parte del texto) a buscar en el titulo.
+
+    Retorna:
+        list[dict]: peliculas cuyo ``title`` u ``original_title`` contienen
+            el texto. Lista vacia si ``texto`` queda vacio al normalizar.
+    """
     texto_norm = _normalizar(texto)
     if not texto_norm:
         return []
@@ -58,12 +86,18 @@ def buscar_por_titulo(catalogo: list[dict], texto: str) -> list[dict]:
     ]
 
 
-# Parametros:
-#   catalogo (list[dict]): lista de peliculas del catalogo.
-#   nombre_actor (str): nombre (o parte del nombre) de un actor/actriz.
-# Retorna:
-#   list[dict]: peliculas donde "cast" incluye alguna coincidencia con nombre_actor.
 def buscar_por_actor(catalogo: list[dict], nombre_actor: str) -> list[dict]:
+    """Busca peliculas en las que participa un actor o actriz.
+
+    Parametros:
+        catalogo (list[dict]): lista de peliculas del catalogo.
+        nombre_actor (str): nombre (o parte del nombre) a buscar en ``cast``.
+
+    Retorna:
+        list[dict]: peliculas donde algun elemento de ``cast`` contiene
+            ``nombre_actor``. Se omiten las que no tienen ``cast`` como lista.
+            Lista vacia si ``nombre_actor`` queda vacio al normalizar.
+    """
     nombre_norm = _normalizar(nombre_actor)
     if not nombre_norm:
         return []
@@ -75,12 +109,18 @@ def buscar_por_actor(catalogo: list[dict], nombre_actor: str) -> list[dict]:
     ]
 
 
-# Parametros:
-#   catalogo (list[dict]): lista de peliculas del catalogo.
-#   nombre_director (str): nombre (o parte del nombre) de un director.
-# Retorna:
-#   list[dict]: peliculas donde "directors" incluye alguna coincidencia.
 def buscar_por_director(catalogo: list[dict], nombre_director: str) -> list[dict]:
+    """Busca peliculas dirigidas por una persona.
+
+    Parametros:
+        catalogo (list[dict]): lista de peliculas del catalogo.
+        nombre_director (str): nombre (o parte del nombre) a buscar en ``directors``.
+
+    Retorna:
+        list[dict]: peliculas donde algun elemento de ``directors`` contiene
+            ``nombre_director``. Se omiten las que no tienen ``directors`` como lista.
+            Lista vacia si ``nombre_director`` queda vacio al normalizar.
+    """
     nombre_norm = _normalizar(nombre_director)
     if not nombre_norm:
         return []
@@ -92,12 +132,19 @@ def buscar_por_director(catalogo: list[dict], nombre_director: str) -> list[dict
     ]
 
 
-# Parametros:
-#   catalogo (list[dict]): lista de peliculas del catalogo.
-#   genero (str): nombre del genero (ej. "Comedy", "Drama").
-# Retorna:
-#   list[dict]: peliculas donde "genres" incluye ese genero.
 def buscar_por_genero(catalogo: list[dict], genero: str) -> list[dict]:
+    """Busca peliculas de un genero.
+
+    Parametros:
+        catalogo (list[dict]): lista de peliculas del catalogo.
+        genero (str): nombre del genero (ej. ``"Comedy"``, ``"Drama"``).
+            Acepta coincidencia parcial (``"com"`` puede matchear ``"Comedy"``).
+
+    Retorna:
+        list[dict]: peliculas donde algun elemento de ``genres`` contiene
+            ``genero``. Se omiten las que no tienen ``genres`` como lista.
+            Lista vacia si ``genero`` queda vacio al normalizar.
+    """
     genero_norm = _normalizar(genero)
     if not genero_norm:
         return []
@@ -109,12 +156,19 @@ def buscar_por_genero(catalogo: list[dict], genero: str) -> list[dict]:
     ]
 
 
-# Parametros:
-#   catalogo (list[dict]): lista de peliculas del catalogo.
-#   pais (str): nombre del pais productor (ej. "Argentina").
-# Retorna:
-#   list[dict]: peliculas donde "production_countries" incluye ese pais.
 def buscar_por_pais(catalogo: list[dict], pais: str) -> list[dict]:
+    """Busca peliculas producidas en un pais.
+
+    Parametros:
+        catalogo (list[dict]): lista de peliculas del catalogo.
+        pais (str): nombre del pais productor (ej. ``"Argentina"``).
+            Acepta coincidencia parcial.
+
+    Retorna:
+        list[dict]: peliculas donde algun elemento de ``production_countries``
+            contiene ``pais``. Se omiten las que no tienen esa clave como lista.
+            Lista vacia si ``pais`` queda vacio al normalizar.
+    """
     pais_norm = _normalizar(pais)
     if not pais_norm:
         return []
@@ -126,12 +180,21 @@ def buscar_por_pais(catalogo: list[dict], pais: str) -> list[dict]:
     ]
 
 
-# Parametros:
-#   catalogo (list[dict]): lista de peliculas del catalogo.
-#   idioma (str): idioma hablado (ej. "English") o codigo de "original_language".
-# Retorna:
-#   list[dict]: peliculas donde "spoken_languages" u "original_language" coinciden.
 def buscar_por_idioma(catalogo: list[dict], idioma: str) -> list[dict]:
+    """Busca peliculas por idioma original o idiomas hablados.
+
+    Parametros:
+        catalogo (list[dict]): lista de peliculas del catalogo.
+        idioma (str): idioma hablado (ej. ``"English"``) o codigo de
+            ``original_language`` (ej. ``"en"``). En ``original_language``
+            se exige igualdad exacta (ya normalizada); en ``spoken_languages``
+            se admite coincidencia parcial.
+
+    Retorna:
+        list[dict]: peliculas cuyo ``original_language`` coincide o cuyo
+            ``spoken_languages`` incluye el idioma. Lista vacia si ``idioma``
+            queda vacio al normalizar.
+    """
     idioma_norm = _normalizar(idioma)
     if not idioma_norm:
         return []
@@ -146,12 +209,19 @@ def buscar_por_idioma(catalogo: list[dict], idioma: str) -> list[dict]:
     ]
 
 
-# Parametros:
-#   catalogo (list[dict]): lista de peliculas del catalogo.
-#   palabra_clave (str): keyword tematica (ej. "friendship", "revenge").
-# Retorna:
-#   list[dict]: peliculas donde "keywords" incluye esa palabra clave.
 def buscar_por_palabra_clave(catalogo: list[dict], palabra_clave: str) -> list[dict]:
+    """Busca peliculas por keyword tematica.
+
+    Parametros:
+        catalogo (list[dict]): lista de peliculas del catalogo.
+        palabra_clave (str): keyword (ej. ``"friendship"``, ``"revenge"``).
+            Acepta coincidencia parcial.
+
+    Retorna:
+        list[dict]: peliculas donde algun elemento de ``keywords`` contiene
+            ``palabra_clave``. Se omiten las que no tienen ``keywords`` como lista.
+            Lista vacia si ``palabra_clave`` queda vacia al normalizar.
+    """
     palabra_norm = _normalizar(palabra_clave)
     if not palabra_norm:
         return []
@@ -163,19 +233,31 @@ def buscar_por_palabra_clave(catalogo: list[dict], palabra_clave: str) -> list[d
     ]
 
 
-# Parametros:
-#   catalogo (list[dict]): lista de peliculas del catalogo.
-#   filtros (dict): pares campo/valor a combinar con AND, por ejemplo
-#       {"genero": "Comedy", "actor": "Tom Hanks", "anio_desde": 1990}.
-#       Las claves validas reutilizan los criterios de las funciones anteriores.
-#       Claves soportadas: "titulo", "actor", "director", "genero", "pais",
-#       "idioma", "keyword" (alias: "palabra_clave"), "anio_desde" y
-#       "anio_hasta". Las claves desconocidas se ignoran y los filtros de
-#       texto vacios no filtran. Si "filtros" esta vacio, se devuelve una
-#       copia del catalogo completo.
-# Retorna:
-#   list[dict]: peliculas que cumplen todos los filtros indicados a la vez.
 def busqueda_combinada(catalogo: list[dict], filtros: dict) -> list[dict]:
+    """Filtra el catalogo aplicando varios criterios a la vez (AND).
+
+    Cada clave de ``filtros`` reutiliza una funcion de busqueda de este modulo.
+    Las claves desconocidas se ignoran. Los filtros de texto vacios no se
+    aplican. Los anios que no se pueden convertir a ``int`` se ignoran.
+    Las peliculas sin anio de estreno valido quedan fuera si hay filtro de anio.
+
+    Parametros:
+        catalogo (list[dict]): lista de peliculas del catalogo.
+        filtros (dict): pares campo/valor, por ejemplo
+            ``{"genero": "Comedy", "actor": "Tom Hanks", "anio_desde": 1990}``.
+
+            Claves soportadas:
+                - ``titulo``, ``actor``, ``director``, ``genero``, ``pais``,
+                  ``idioma``: texto, coincidencia parcial.
+                - ``keyword`` (alias: ``palabra_clave``): keyword tematica.
+                - ``anio_desde`` / ``anio_hasta``: inclusive, segun
+                  ``release_date``. Aceptan int o str convertible a int.
+
+    Retorna:
+        list[dict]: peliculas que cumplen todos los filtros indicados.
+            Si ``filtros`` no es un dict o esta vacio, se devuelve una copia
+            del catalogo completo.
+    """
     if not isinstance(filtros, dict) or not filtros:
         return list(catalogo)
     resultado = list(catalogo)
