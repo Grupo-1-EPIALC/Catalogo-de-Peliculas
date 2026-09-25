@@ -21,6 +21,7 @@ Funciones auxiliares (entrada/salida por consola):
 - _pedir_entero
 - _pedir_lista
 - _mostrar_resultado
+- _ordenar_por_valor_desc
 """
 
 import crud
@@ -124,24 +125,52 @@ def _pedir_lista(mensaje: str) -> list[str]:
     return [valor.strip() for valor in texto.split(",") if valor.strip()]
 
 
+# Cantidad maxima de filas que se imprimen por consola en un solo resultado.
+# Algunos resultados agrupan por actor o director y pueden tener miles de
+# claves (ej. promedio_por_actor sobre el dataset completo), asi que sin este
+# limite la consola quedaria inundada de lineas.
+_LIMITE_RESULTADOS_MOSTRADOS = 20
+
+
+# Parametros:
+#   diccionario (dict[str, float]): resultado de una funcion de promedios
+#       (ej. promedio_por_genero, promedio_por_director).
+# Retorna:
+#   dict[str, float]: el mismo diccionario ordenado de mayor a menor valor,
+#       para que al truncar con _LIMITE_RESULTADOS_MOSTRADOS se muestren
+#       primero los promedios mas altos (los mas relevantes) y no un
+#       subconjunto arbitrario.
+def _ordenar_por_valor_desc(diccionario: dict[str, float]) -> dict[str, float]:
+    return dict(sorted(diccionario.items(), key=lambda item: item[1], reverse=True))
+
+
 # Parametros:
 #   resultado (object): valor devuelto por una funcion de crud/busqueda/
 #       rankings/estadisticas/recomendaciones (lista de peliculas, dict de
 #       promedios, lista de tuplas, numero, etc.).
 # Retorna:
-#   None. Imprime el resultado por consola con un formato legible segun su tipo.
+#   None. Imprime el resultado por consola con un formato legible segun su
+#       tipo, truncando a _LIMITE_RESULTADOS_MOSTRADOS filas cuando el
+#       resultado es una lista o un diccionario grande.
 def _mostrar_resultado(resultado: object) -> None:
     if resultado is None:
         print("(sin resultado)")
     elif isinstance(resultado, list) and resultado and isinstance(resultado[0], dict):
-        for pelicula in resultado:
+        for pelicula in resultado[:_LIMITE_RESULTADOS_MOSTRADOS]:
             print("-", pelicula.get("title", pelicula))
+        if len(resultado) > _LIMITE_RESULTADOS_MOSTRADOS:
+            print(f"... y {len(resultado) - _LIMITE_RESULTADOS_MOSTRADOS} peliculas mas.")
     elif isinstance(resultado, dict):
-        for clave, valor in resultado.items():
+        items = list(resultado.items())
+        for clave, valor in items[:_LIMITE_RESULTADOS_MOSTRADOS]:
             print(f"{clave}: {valor}")
+        if len(items) > _LIMITE_RESULTADOS_MOSTRADOS:
+            print(f"... y {len(items) - _LIMITE_RESULTADOS_MOSTRADOS} mas.")
     elif isinstance(resultado, list):
-        for item in resultado:
+        for item in resultado[:_LIMITE_RESULTADOS_MOSTRADOS]:
             print("-", item)
+        if len(resultado) > _LIMITE_RESULTADOS_MOSTRADOS:
+            print(f"... y {len(resultado) - _LIMITE_RESULTADOS_MOSTRADOS} mas.")
     else:
         print(resultado)
 
@@ -183,9 +212,15 @@ def menu_busqueda(catalogo: list[dict]) -> None:
             resultado = busqueda.buscar_por_palabra_clave(catalogo, input("Palabra clave: "))
         elif opcion == 8:
             filtros = {
+                "titulo": input("Titulo (vacio para omitir): ") or None,
                 "genero": input("Genero (vacio para omitir): ") or None,
                 "actor": input("Actor (vacio para omitir): ") or None,
                 "director": input("Director (vacio para omitir): ") or None,
+                "pais": input("Pais (vacio para omitir): ") or None,
+                "idioma": input("Idioma (vacio para omitir): ") or None,
+                "palabra_clave": input("Palabra clave (vacio para omitir): ") or None,
+                "anio_desde": input("Anio desde (vacio para omitir): ") or None,
+                "anio_hasta": input("Anio hasta (vacio para omitir): ") or None,
             }
             resultado = busqueda.busqueda_combinada(catalogo, filtros)
         else:
@@ -310,21 +345,21 @@ def menu_estadisticas(catalogo: list[dict]) -> None:
             resultado = estadisticas.promedio_general(catalogo, campo)
         elif opcion == 2:
             campo = input("Campo numerico: ")
-            resultado = estadisticas.promedio_por_genero(catalogo, campo)
+            resultado = _ordenar_por_valor_desc(estadisticas.promedio_por_genero(catalogo, campo))
         elif opcion == 3:
             campo = input("Campo numerico: ")
-            resultado = estadisticas.promedio_por_director(catalogo, campo)
+            resultado = _ordenar_por_valor_desc(estadisticas.promedio_por_director(catalogo, campo))
         elif opcion == 4:
             campo = input("Campo numerico: ")
-            resultado = estadisticas.promedio_por_actor(catalogo, campo)
+            resultado = _ordenar_por_valor_desc(estadisticas.promedio_por_actor(catalogo, campo))
         elif opcion == 5:
             campo = input("Campo numerico: ")
-            resultado = estadisticas.promedio_por_pais(catalogo, campo)
+            resultado = _ordenar_por_valor_desc(estadisticas.promedio_por_pais(catalogo, campo))
         elif opcion == 6:
             campo = input("Campo numerico: ")
-            resultado = estadisticas.promedio_por_idioma(catalogo, campo)
+            resultado = _ordenar_por_valor_desc(estadisticas.promedio_por_idioma(catalogo, campo))
         elif opcion == 7:
-            resultado = estadisticas.peliculas_por_anio(catalogo)
+            resultado = dict(sorted(estadisticas.peliculas_por_anio(catalogo).items()))
         elif opcion == 8:
             resultado = estadisticas.resumen_estadistico(catalogo)
         else:
@@ -354,8 +389,9 @@ def menu_recomendaciones(catalogo: list[dict]) -> None:
             generos_preferidos = _pedir_lista("Generos preferidos (separados por coma): ")
             directores_preferidos = _pedir_lista("Directores preferidos (separados por coma): ")
             actores_preferidos = _pedir_lista("Actores preferidos (separados por coma): ")
+            idiomas_preferidos = _pedir_lista("Idiomas preferidos (separados por coma): ")
             perfil_usuario = recomendaciones.crear_perfil_usuario(
-                nombre, generos_preferidos, directores_preferidos, actores_preferidos
+                nombre, generos_preferidos, directores_preferidos, actores_preferidos, idiomas_preferidos
             )
             print("Perfil creado.")
             continue

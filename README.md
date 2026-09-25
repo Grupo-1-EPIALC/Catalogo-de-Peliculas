@@ -79,6 +79,32 @@ Orden sugerido de implementacion: `crud.py` → `busqueda.py` → `estadisticas.
 → `rankings.py` → `recomendaciones.py`, y `main.py` al final (o en paralelo,
 una vez que las funciones que va a llamar ya existen).
 
+## Tests
+
+El proyecto usa `pytest`. Los tests viven en `tests/`, un archivo por modulo
+(`test_crud.py`, `test_busqueda.py`, `test_rankings.py`, `test_estadisticas.py`,
+`test_recomendaciones.py`, `test_main.py`).
+
+```bash
+pytest
+```
+
+Cada archivo de test tiene:
+- **Tests unitarios**: prueban la logica propia del modulo con datos de
+  prueba chicos armados a mano, sin depender de otros modulos todavia sin
+  implementar (cuando un modulo depende de otro, ese otro se "mockea").
+- **Tests funcionales**: corren las mismas funciones contra
+  `data/movies_unified.json` completo (45.433 peliculas reales) y/o contra
+  varios modulos juntos, para validar el comportamiento de punta a punta.
+
+Los modulos que todavia son un stub (`pass # TODO: implementar`) localmente
+hacen que sus tests se salten automaticamente (`SKIPPED`), no que fallen: la
+suite detecta en tiempo de ejecucion si el modulo ya esta implementado y
+activa los tests solos, sin tocar nada, apenas se mergee la implementacion
+real a la rama en la que se corra `pytest`. Los tests de `test_estadisticas.py`
+que usan el dataset completo tambien se saltean si `data/movies_unified.json`
+no existe (no esta versionado; lo genera `eda dataset.ipynb`).
+
 ## Como contribuir
 
 Todo cambio va en una rama nueva a partir de `develop` (nunca commits directos a
@@ -90,7 +116,13 @@ IA en [`CLAUDE.md`](CLAUDE.md).
 - [x] Definir fuente de datos del catalogo (The Movies Dataset - Kaggle)
 - [x] Descarga y unificacion de CSVs en JSON por pelicula
 - [x] Estructura de modulos (`crud.py`, `busqueda.py`, `rankings.py`, `estadisticas.py`, `recomendaciones.py`, `main.py`) sin implementar
-- [ ] Implementacion de cada modulo (ver tabla de complejidad arriba)
+- [x] Suite de tests (`pytest`) para todos los modulos, con auto-skip de lo que falta implementar
+- [x] `estadisticas.py` implementado
+- [x] `recomendaciones.py` implementado
+- [x] `main.py` (menu por consola) implementado
+- [ ] `crud.py` implementado (listo en rama `feature/implementacion-crud`, falta mergear)
+- [ ] `busqueda.py` implementado (listo en rama `feature/busqueda-peliculas`, falta mergear)
+- [ ] `rankings.py` implementado
 - [ ] Exploracion de datos (EDA)
 - [ ] Limpieza y transformacion adicional
 - [ ] Analisis / modelo
