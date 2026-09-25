@@ -87,10 +87,10 @@ Se explico que ninguna funcion existente resumia (todas devolvian el objeto comp
 ## Entrada 7 — 2026-09-25
 
 **Prompt del usuario:**
-> Creame el jupyter notebook para probar mi motor de busqueda, que no se va a subir al repo, es solo para nosotros.
+> Creame el jupyter notebook para probar mi motor de busqueda (de uso local, sin subirlo al repo).
 
 **Respuesta / propuesta de la IA:**
-Se creo `prueba_busqueda.ipynb` en la raiz (13 celdas: carga del catalogo completo con fallback al sample, titulo→objeto completo, listados con `resumen=True` por actor/director/genero/pais/idioma/keyword, combinada con tiempos, compatibilidad hacia atras y casos borde). Se ejecuto con `nbclient` en el `.venv` contra las 45433 peliculas y quedo guardado con outputs reales, sin errores. Para que no se suba jamas, se excluyo en `.git/info/exclude` (local, sin tocar archivos versionados): `git status` no lo muestra y `git check-ignore` lo confirma.
+Se creo `prueba_busqueda.ipynb` en la raiz (13 celdas: carga del catalogo completo con fallback al sample, titulo→objeto completo, listados con `resumen=True` por actor/director/genero/pais/idioma/keyword, combinada con tiempos, compatibilidad hacia atras y casos borde). Se ejecuto con `nbclient` en el `.venv` contra las 45433 peliculas y quedo guardado con outputs reales, sin errores. Para que no se versione, se excluyo en `.git/info/exclude` (configuracion local, sin tocar archivos versionados): `git status` no lo muestra y `git check-ignore` lo confirma.
 
 **Decisión del usuario:** Aceptado
 
