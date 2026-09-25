@@ -124,11 +124,11 @@ IA en [`CLAUDE.md`](CLAUDE.md).
 - [x] `estadisticas.py` implementado
 - [x] `recomendaciones.py` implementado
 - [x] `main.py` (menu por consola) implementado
-- [ ] `crud.py` implementado (listo en rama `feature/implementacion-crud`, falta mergear)
-- [ ] `busqueda.py` implementado (listo en rama `feature/busqueda-peliculas`, falta mergear)
+- [x] `crud.py` implementado (listo en rama `feature/implementacion-crud`, falta mergear)
+- [x] `busqueda.py` implementado (listo en rama `feature/busqueda-peliculas`, falta mergear)
 - [ ] `rankings.py` implementado
-- [ ] Exploracion de datos (EDA)
-- [ ] Limpieza y transformacion adicional
+- [x] Exploracion de datos (EDA)
+- [x] Limpieza y transformacion adicional
 - [ ] Analisis / modelo
 - [ ] Conclusiones
 
@@ -137,7 +137,6 @@ El reparto queda asi:
 * Dario - crud.py
 * Elian - busqueda.py
 * Lucho - rankings.py
-* Leonardo - recomendaciones.py o main.py (de acuerdo a tu nivel)
-* Andres - estadisticas.py y main.py o recomendaciones.py
 
+* Andres - estadisticas.py, recomendaciones.py y main.py o 
 ### Recuerden que deberia estar subido al repo el jueves a la noche a mas tardar
