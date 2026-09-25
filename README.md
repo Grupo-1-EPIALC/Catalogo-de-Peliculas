@@ -120,11 +120,11 @@ IA en [`CLAUDE.md`](CLAUDE.md).
 - [x] `estadisticas.py` implementado
 - [x] `recomendaciones.py` implementado
 - [x] `main.py` (menu por consola) implementado
-- [ ] `crud.py` implementado (listo en rama `feature/implementacion-crud`, falta mergear)
-- [ ] `busqueda.py` implementado (listo en rama `feature/busqueda-peliculas`, falta mergear)
+- [x] `crud.py` implementado (listo en rama `feature/implementacion-crud`, falta mergear)
+- [x] `busqueda.py` implementado (listo en rama `feature/busqueda-peliculas`, falta mergear)
 - [ ] `rankings.py` implementado
-- [ ] Exploracion de datos (EDA)
-- [ ] Limpieza y transformacion adicional
+- [x] Exploracion de datos (EDA)
+- [x] Limpieza y transformacion adicional
 - [ ] Analisis / modelo
 - [ ] Conclusiones
 
