@@ -23,6 +23,19 @@ Funciones que contiene:
 - quitar_valor_de_lista
 """
 
+import json
+
+# Helper interno para validar la existencia y el tipo de un campo tipo lista
+_CAMPOS_LISTA_VALIDOS = {
+    "genres",
+    "production_companies",
+    "production_countries",
+    "spoken_languages",
+    "cast",
+    "directors",
+    "keywords",
+}
+
 
 # Parametros:
 #   ruta_json (str): ruta al archivo JSON con el catalogo de peliculas.
@@ -33,7 +46,19 @@ Funciones que contiene:
 #   esta mal formado. En ambos casos informar un mensaje claro (no dejar que
 #   el programa se caiga) y devolver una lista vacia.
 def cargar_catalogo(ruta_json: str) -> list[dict]:
-    pass  # TODO: implementar
+    try:
+        with open(ruta_json, "r", encoding="utf-8") as archivo:
+            datos = json.load(archivo)
+            if not isinstance(datos, list):
+                print(f"Error: El archivo '{ruta_json}' no contiene una lista de películas válida.")
+                return []
+            return datos
+    except FileNotFoundError:
+        print(f"Error: No se encontró el archivo en la ruta '{ruta_json}'.")
+        return []
+    except json.JSONDecodeError as e:
+        print(f"Error: El archivo '{ruta_json}' está mal formado o corrupto ({e}).")
+        return []
 
 
 # Parametros:
@@ -44,7 +69,11 @@ def cargar_catalogo(ruta_json: str) -> list[dict]:
 # Manejo de errores esperado:
 #   OSError si no se puede escribir el archivo (permisos, disco, ruta invalida).
 def guardar_catalogo(catalogo: list[dict], ruta_json: str) -> None:
-    pass  # TODO: implementar
+    try:
+        with open(ruta_json, "w", encoding="utf-8") as archivo:
+            json.dump(catalogo, archivo, ensure_ascii=False, indent=2)
+    except OSError as e:
+        print(f"Error de E/S al intentar guardar en '{ruta_json}': {e}")
 
 
 # Parametros:
@@ -53,7 +82,10 @@ def guardar_catalogo(catalogo: list[dict], ruta_json: str) -> None:
 # Retorna:
 #   dict | None: la pelicula encontrada, o None si no existe ese id.
 def obtener_pelicula_por_id(catalogo: list[dict], id_pelicula: int) -> dict | None:
-    pass  # TODO: implementar
+    for pelicula in catalogo:
+        if pelicula.get("id") == id_pelicula:
+            return pelicula
+    return None
 
 
 # Parametros:
@@ -64,7 +96,15 @@ def obtener_pelicula_por_id(catalogo: list[dict], id_pelicula: int) -> dict | No
 # Manejo de errores esperado:
 #   ValueError si ya existe una pelicula con el mismo "id".
 def crear_pelicula(catalogo: list[dict], nueva_pelicula: dict) -> list[dict]:
-    pass  # TODO: implementar
+    if "id" not in nueva_pelicula or "title" not in nueva_pelicula:
+        raise ValueError("La nueva película debe incluir obligatoriamente los campos 'id' y 'title'.")
+
+    id_nueva = nueva_pelicula["id"]
+    if obtener_pelicula_por_id(catalogo, id_nueva) is not None:
+        raise ValueError(f"Ya existe una película en el catálogo con el id {id_nueva}.")
+
+    catalogo.append(nueva_pelicula)
+    return catalogo
 
 
 # Parametros:
@@ -77,7 +117,14 @@ def crear_pelicula(catalogo: list[dict], nueva_pelicula: dict) -> list[dict]:
 # Manejo de errores esperado:
 #   ValueError si no existe una pelicula con ese id.
 def actualizar_pelicula(catalogo: list[dict], id_pelicula: int, campos_actualizados: dict) -> list[dict]:
-    pass  # TODO: implementar
+    pelicula = obtener_pelicula_por_id(catalogo, id_pelicula)
+    if pelicula is None:
+        raise ValueError(f"No existe ninguna película con el id {id_pelicula}.")
+
+    for clave, valor in campos_actualizados.items():
+        pelicula[clave] = valor
+
+    return catalogo
 
 
 # Parametros:
@@ -88,7 +135,12 @@ def actualizar_pelicula(catalogo: list[dict], id_pelicula: int, campos_actualiza
 # Manejo de errores esperado:
 #   ValueError si no existe una pelicula con ese id.
 def eliminar_pelicula(catalogo: list[dict], id_pelicula: int) -> list[dict]:
-    pass  # TODO: implementar
+    pelicula = obtener_pelicula_por_id(catalogo, id_pelicula)
+    if pelicula is None:
+        raise ValueError(f"No existe ninguna película con el id {id_pelicula}.")
+
+    catalogo.remove(pelicula)
+    return catalogo
 
 
 # Parametros:
@@ -103,8 +155,15 @@ def eliminar_pelicula(catalogo: list[dict], id_pelicula: int) -> list[dict]:
 # Manejo de errores esperado:
 #   ValueError si no existe la pelicula o si campo_lista no es un campo de tipo lista.
 def agregar_valor_a_lista(catalogo: list[dict], id_pelicula: int, campo_lista: str, valor: str) -> list[dict]:
-    pass  # TODO: implementar
+    pelicula = obtener_pelicula_por_id(catalogo, id_pelicula)
+    if pelicula is None:
+        raise ValueError(f"No existe ninguna película con el id {id_pelicula}.")
 
+    if campo_lista not in _CAMPOS_LISTA_VALIDOS or not isinstance(pelicula.get(campo_lista), list):
+        raise ValueError(f"El campo '{campo_lista}' no es un campo válido de tipo lista.")
+
+    pelicula[campo_lista].append(valor)
+    return catalogo
 
 # Parametros:
 #   catalogo (list[dict]): lista de peliculas del catalogo.
@@ -117,4 +176,16 @@ def agregar_valor_a_lista(catalogo: list[dict], id_pelicula: int, campo_lista: s
 #   ValueError si no existe la pelicula, si campo_lista no es una lista, o si
 #   el valor no estaba presente en la lista.
 def quitar_valor_de_lista(catalogo: list[dict], id_pelicula: int, campo_lista: str, valor: str) -> list[dict]:
-    pass  # TODO: implementar
+    pelicula = obtener_pelicula_por_id(catalogo, id_pelicula)
+    if pelicula is None:
+        raise ValueError(f"No existe ninguna película con el id {id_pelicula}.")
+
+    if campo_lista not in _CAMPOS_LISTA_VALIDOS or not isinstance(pelicula.get(campo_lista), list):
+        raise ValueError(f"El campo '{campo_lista}' no es un campo válido de tipo lista.")
+
+    lista_campo = pelicula[campo_lista]
+    if valor not in lista_campo:
+        raise ValueError(f"El valor '{valor}' no está presente en la lista de '{campo_lista}'.")
+
+    lista_campo.remove(valor)
+    return catalogo
