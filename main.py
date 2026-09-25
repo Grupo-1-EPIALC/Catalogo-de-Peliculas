@@ -3,13 +3,24 @@ main.py
 
 Punto de entrada de la aplicacion. Integra los modulos crud.py, busqueda.py,
 rankings.py, estadisticas.py y recomendaciones.py detras de un menu por
-consola. Este archivo NO debe tener logica de negocio (eso vive en los otros
-modulos); solo debe leer la opcion del usuario, llamar a la(s) funcion(es)
-correspondiente(s) y mostrar el resultado.
+consola, organizado en un submenu por modulo. Este archivo no tiene logica de
+negocio (eso vive en los otros modulos): solo lee la opcion y los datos que
+ingresa el usuario, llama a la funcion correspondiente con sus parametros
+reales y muestra el resultado.
 
 Funciones que contiene:
 - mostrar_menu
+- menu_busqueda
+- menu_crud
+- menu_rankings
+- menu_estadisticas
+- menu_recomendaciones
 - main
+
+Funciones auxiliares (entrada/salida por consola):
+- _pedir_entero
+- _pedir_lista
+- _mostrar_resultado
 """
 
 import crud
@@ -22,72 +33,386 @@ import recomendaciones
 # Ruta del archivo con el catalogo unificado generado por `eda dataset.ipynb`.
 RUTA_DATOS = "data/movies_unified.json"
 
-# Opciones de menu -> que modulo.funcion se llama en cada una.
-# 1. Buscar por titulo         -> busqueda.buscar_por_titulo(catalogo, texto)
-# 2. Buscar por actor          -> busqueda.buscar_por_actor(catalogo, nombre_actor)
-# 3. Buscar por director       -> busqueda.buscar_por_director(catalogo, nombre_director)
-# 4. Buscar por genero         -> busqueda.buscar_por_genero(catalogo, genero)
-# 5. Buscar por pais / idioma  -> busqueda.buscar_por_pais / buscar_por_idioma
-# 6. Busqueda combinada        -> busqueda.busqueda_combinada(catalogo, filtros)
-# 7. Ver pelicula por id       -> crud.obtener_pelicula_por_id(catalogo, id_pelicula)
-# 8. Agregar pelicula          -> crud.crear_pelicula(...) y luego crud.guardar_catalogo(...)
-# 9. Editar pelicula           -> crud.actualizar_pelicula(...) y luego crud.guardar_catalogo(...)
-# 10. Eliminar pelicula        -> crud.eliminar_pelicula(...) y luego crud.guardar_catalogo(...)
-# 11. Top peliculas / por genero, actor, director -> rankings.top_peliculas / top_por_*
-# 12. Ranking de generos, actores o directores    -> rankings.ranking_generos / ranking_actores / ranking_directores
-# 13. Ver estadisticas generales                  -> estadisticas.resumen_estadistico(catalogo)
-# 14. Ver promedios por categoria                 -> estadisticas.promedio_por_genero / _director / _actor / _pais / _idioma
-# 15. Crear perfil de usuario                     -> recomendaciones.crear_perfil_usuario(...)
-# 16. Recomendacion por ranking                   -> recomendaciones.recomendar_por_ranking(catalogo, perfil, campo_puntuacion, cantidad)
-# 17. Recomendacion al azar                       -> recomendaciones.recomendar_al_azar(catalogo, perfil, cantidad)
-# 0. Salir                                        -> guardar cambios pendientes (crud.guardar_catalogo) y terminar el bucle
-MENU_OPCIONES: dict[int, str] = {
+MENU_PRINCIPAL: dict[int, str] = {
+    1: "Busqueda",
+    2: "CRUD de peliculas",
+    3: "Rankings",
+    4: "Estadisticas",
+    5: "Recomendaciones",
+    0: "Salir",
+}
+
+# busqueda.py
+MENU_BUSQUEDA: dict[int, str] = {
     1: "Buscar por titulo",
     2: "Buscar por actor",
     3: "Buscar por director",
     4: "Buscar por genero",
-    5: "Buscar por pais / idioma",
-    6: "Busqueda combinada (varios filtros)",
-    7: "Ver pelicula por id",
-    8: "Agregar pelicula",
-    9: "Editar pelicula",
-    10: "Eliminar pelicula",
-    11: "Top peliculas (general / por genero / actor / director)",
-    12: "Ranking de generos, actores o directores",
-    13: "Ver estadisticas generales",
-    14: "Ver promedios por categoria",
-    15: "Crear perfil de usuario",
-    16: "Recomendacion por ranking",
-    17: "Recomendacion al azar",
-    0: "Salir",
+    5: "Buscar por pais",
+    6: "Buscar por idioma",
+    7: "Buscar por palabra clave",
+    8: "Busqueda combinada (varios filtros)",
+    0: "Volver al menu principal",
+}
+
+# crud.py
+MENU_CRUD: dict[int, str] = {
+    1: "Ver pelicula por id",
+    2: "Agregar pelicula",
+    3: "Editar un campo de una pelicula",
+    4: "Eliminar pelicula",
+    5: "Agregar valor a una lista (genero, actor, etc.)",
+    6: "Quitar valor de una lista (genero, actor, etc.)",
+    0: "Volver al menu principal",
+}
+
+# rankings.py
+MENU_RANKINGS: dict[int, str] = {
+    1: "Top peliculas (general)",
+    2: "Top peliculas por genero",
+    3: "Top peliculas por actor",
+    4: "Top peliculas por director",
+    5: "Ranking de generos por promedio",
+    6: "Ranking de actores por promedio",
+    7: "Ranking de directores por promedio",
+    0: "Volver al menu principal",
+}
+
+# estadisticas.py
+MENU_ESTADISTICAS: dict[int, str] = {
+    1: "Promedio general de un campo",
+    2: "Promedio por genero",
+    3: "Promedio por director",
+    4: "Promedio por actor",
+    5: "Promedio por pais",
+    6: "Promedio por idioma",
+    7: "Cantidad de peliculas por anio",
+    8: "Resumen estadistico general",
+    0: "Volver al menu principal",
+}
+
+# recomendaciones.py
+MENU_RECOMENDACIONES: dict[int, str] = {
+    1: "Crear perfil de usuario",
+    2: "Ver peliculas afines al perfil (sin ordenar)",
+    3: "Recomendacion por ranking",
+    4: "Recomendacion al azar",
+    0: "Volver al menu principal",
 }
 
 
-# Parametros: ninguno.
+# Parametros:
+#   mensaje (str): texto que se muestra antes de leer la entrada.
 # Retorna:
-#   None. Imprime por consola las opciones definidas en MENU_OPCIONES.
-def mostrar_menu() -> None:
-    pass  # TODO: implementar
+#   int: numero ingresado por el usuario. Vuelve a preguntar si el valor
+#       ingresado no es un entero valido (ValueError).
+def _pedir_entero(mensaje: str) -> int:
+    while True:
+        try:
+            return int(input(mensaje))
+        except ValueError:
+            print("Ingrese un numero entero valido.")
+
+
+# Parametros:
+#   mensaje (str): texto que se muestra antes de leer la entrada.
+# Retorna:
+#   list[str]: valores separados por coma, sin espacios sobrantes ni
+#       elementos vacios (ej. "Drama, Accion" -> ["Drama", "Accion"]).
+def _pedir_lista(mensaje: str) -> list[str]:
+    texto = input(mensaje)
+    return [valor.strip() for valor in texto.split(",") if valor.strip()]
+
+
+# Parametros:
+#   resultado (object): valor devuelto por una funcion de crud/busqueda/
+#       rankings/estadisticas/recomendaciones (lista de peliculas, dict de
+#       promedios, lista de tuplas, numero, etc.).
+# Retorna:
+#   None. Imprime el resultado por consola con un formato legible segun su tipo.
+def _mostrar_resultado(resultado: object) -> None:
+    if resultado is None:
+        print("(sin resultado)")
+    elif isinstance(resultado, list) and resultado and isinstance(resultado[0], dict):
+        for pelicula in resultado:
+            print("-", pelicula.get("title", pelicula))
+    elif isinstance(resultado, dict):
+        for clave, valor in resultado.items():
+            print(f"{clave}: {valor}")
+    elif isinstance(resultado, list):
+        for item in resultado:
+            print("-", item)
+    else:
+        print(resultado)
+
+
+# Parametros:
+#   opciones (dict[int, str]): mapa numero de opcion -> descripcion.
+# Retorna:
+#   None. Imprime cada opcion por consola.
+def mostrar_menu(opciones: dict[int, str]) -> None:
+    for numero, descripcion in opciones.items():
+        print(f"{numero}. {descripcion}")
+
+
+# Parametros:
+#   catalogo (list[dict]): catalogo de peliculas ya cargado en memoria.
+# Retorna:
+#   None. Este submenu solo consulta datos (busqueda.py), no modifica el catalogo.
+def menu_busqueda(catalogo: list[dict]) -> None:
+    while True:
+        print("\n--- Busqueda ---")
+        mostrar_menu(MENU_BUSQUEDA)
+        opcion = _pedir_entero("Opcion: ")
+
+        if opcion == 0:
+            return
+        if opcion == 1:
+            resultado = busqueda.buscar_por_titulo(catalogo, input("Titulo a buscar: "))
+        elif opcion == 2:
+            resultado = busqueda.buscar_por_actor(catalogo, input("Nombre del actor: "))
+        elif opcion == 3:
+            resultado = busqueda.buscar_por_director(catalogo, input("Nombre del director: "))
+        elif opcion == 4:
+            resultado = busqueda.buscar_por_genero(catalogo, input("Genero: "))
+        elif opcion == 5:
+            resultado = busqueda.buscar_por_pais(catalogo, input("Pais: "))
+        elif opcion == 6:
+            resultado = busqueda.buscar_por_idioma(catalogo, input("Idioma: "))
+        elif opcion == 7:
+            resultado = busqueda.buscar_por_palabra_clave(catalogo, input("Palabra clave: "))
+        elif opcion == 8:
+            filtros = {
+                "genero": input("Genero (vacio para omitir): ") or None,
+                "actor": input("Actor (vacio para omitir): ") or None,
+                "director": input("Director (vacio para omitir): ") or None,
+            }
+            resultado = busqueda.busqueda_combinada(catalogo, filtros)
+        else:
+            print("Opcion invalida.")
+            continue
+
+        _mostrar_resultado(resultado)
+
+
+# Parametros:
+#   catalogo (list[dict]): catalogo de peliculas ya cargado en memoria.
+# Retorna:
+#   list[dict]: el catalogo, actualizado si el usuario creo/edito/elimino
+#       alguna pelicula (crud.py). Cada cambio se persiste de inmediato con
+#       crud.guardar_catalogo.
+def menu_crud(catalogo: list[dict]) -> list[dict]:
+    while True:
+        print("\n--- CRUD de peliculas ---")
+        mostrar_menu(MENU_CRUD)
+        opcion = _pedir_entero("Opcion: ")
+
+        if opcion == 0:
+            return catalogo
+        if opcion == 1:
+            id_pelicula = _pedir_entero("Id de la pelicula: ")
+            _mostrar_resultado(crud.obtener_pelicula_por_id(catalogo, id_pelicula))
+            continue
+        if opcion == 2:
+            nueva_pelicula = {
+                "id": _pedir_entero("Id de la nueva pelicula: "),
+                "title": input("Titulo: "),
+            }
+            catalogo = crud.crear_pelicula(catalogo, nueva_pelicula)
+        elif opcion == 3:
+            id_pelicula = _pedir_entero("Id de la pelicula a editar: ")
+            campo = input("Campo a modificar (ej. title, vote_average, tagline): ")
+            valor = input("Nuevo valor: ")
+            catalogo = crud.actualizar_pelicula(catalogo, id_pelicula, {campo: valor})
+        elif opcion == 4:
+            id_pelicula = _pedir_entero("Id de la pelicula a eliminar: ")
+            catalogo = crud.eliminar_pelicula(catalogo, id_pelicula)
+        elif opcion == 5:
+            id_pelicula = _pedir_entero("Id de la pelicula: ")
+            campo_lista = input("Campo tipo lista (genres, cast, directors, keywords, production_companies, production_countries, spoken_languages): ")
+            valor = input("Valor a agregar: ")
+            catalogo = crud.agregar_valor_a_lista(catalogo, id_pelicula, campo_lista, valor)
+        elif opcion == 6:
+            id_pelicula = _pedir_entero("Id de la pelicula: ")
+            campo_lista = input("Campo tipo lista (genres, cast, directors, keywords, production_companies, production_countries, spoken_languages): ")
+            valor = input("Valor a quitar: ")
+            catalogo = crud.quitar_valor_de_lista(catalogo, id_pelicula, campo_lista, valor)
+        else:
+            print("Opcion invalida.")
+            continue
+
+        crud.guardar_catalogo(catalogo, RUTA_DATOS)
+
+
+# Parametros:
+#   catalogo (list[dict]): catalogo de peliculas ya cargado en memoria.
+# Retorna:
+#   None. Este submenu solo consulta datos (rankings.py).
+def menu_rankings(catalogo: list[dict]) -> None:
+    while True:
+        print("\n--- Rankings ---")
+        mostrar_menu(MENU_RANKINGS)
+        opcion = _pedir_entero("Opcion: ")
+
+        if opcion == 0:
+            return
+        if opcion == 1:
+            campo = input("Campo de puntuacion (vote_average, popularity, vote_count): ")
+            cantidad = _pedir_entero("Cantidad de peliculas: ")
+            resultado = rankings.top_peliculas(catalogo, campo, cantidad)
+        elif opcion == 2:
+            genero = input("Genero: ")
+            campo = input("Campo de puntuacion: ")
+            cantidad = _pedir_entero("Cantidad de peliculas: ")
+            resultado = rankings.top_por_genero(catalogo, genero, campo, cantidad)
+        elif opcion == 3:
+            actor = input("Actor: ")
+            campo = input("Campo de puntuacion: ")
+            cantidad = _pedir_entero("Cantidad de peliculas: ")
+            resultado = rankings.top_por_actor(catalogo, actor, campo, cantidad)
+        elif opcion == 4:
+            director = input("Director: ")
+            campo = input("Campo de puntuacion: ")
+            cantidad = _pedir_entero("Cantidad de peliculas: ")
+            resultado = rankings.top_por_director(catalogo, director, campo, cantidad)
+        elif opcion == 5:
+            campo = input("Campo de puntuacion: ")
+            resultado = rankings.ranking_generos(catalogo, campo)
+        elif opcion == 6:
+            campo = input("Campo de puntuacion: ")
+            minimo = _pedir_entero("Minimo de peliculas por actor: ")
+            resultado = rankings.ranking_actores(catalogo, campo, minimo)
+        elif opcion == 7:
+            campo = input("Campo de puntuacion: ")
+            minimo = _pedir_entero("Minimo de peliculas por director: ")
+            resultado = rankings.ranking_directores(catalogo, campo, minimo)
+        else:
+            print("Opcion invalida.")
+            continue
+
+        _mostrar_resultado(resultado)
+
+
+# Parametros:
+#   catalogo (list[dict]): catalogo de peliculas ya cargado en memoria.
+# Retorna:
+#   None. Este submenu solo consulta datos (estadisticas.py).
+def menu_estadisticas(catalogo: list[dict]) -> None:
+    while True:
+        print("\n--- Estadisticas ---")
+        mostrar_menu(MENU_ESTADISTICAS)
+        opcion = _pedir_entero("Opcion: ")
+
+        if opcion == 0:
+            return
+        if opcion == 1:
+            campo = input("Campo numerico (vote_average, runtime, budget, revenue, popularity): ")
+            resultado = estadisticas.promedio_general(catalogo, campo)
+        elif opcion == 2:
+            campo = input("Campo numerico: ")
+            resultado = estadisticas.promedio_por_genero(catalogo, campo)
+        elif opcion == 3:
+            campo = input("Campo numerico: ")
+            resultado = estadisticas.promedio_por_director(catalogo, campo)
+        elif opcion == 4:
+            campo = input("Campo numerico: ")
+            resultado = estadisticas.promedio_por_actor(catalogo, campo)
+        elif opcion == 5:
+            campo = input("Campo numerico: ")
+            resultado = estadisticas.promedio_por_pais(catalogo, campo)
+        elif opcion == 6:
+            campo = input("Campo numerico: ")
+            resultado = estadisticas.promedio_por_idioma(catalogo, campo)
+        elif opcion == 7:
+            resultado = estadisticas.peliculas_por_anio(catalogo)
+        elif opcion == 8:
+            resultado = estadisticas.resumen_estadistico(catalogo)
+        else:
+            print("Opcion invalida.")
+            continue
+
+        _mostrar_resultado(resultado)
+
+
+# Parametros:
+#   catalogo (list[dict]): catalogo de peliculas ya cargado en memoria.
+# Retorna:
+#   None. Este submenu solo consulta datos (recomendaciones.py); el perfil de
+#   usuario se guarda en memoria mientras dura el submenu (no se persiste).
+def menu_recomendaciones(catalogo: list[dict]) -> None:
+    perfil_usuario: dict | None = None
+
+    while True:
+        print("\n--- Recomendaciones ---")
+        mostrar_menu(MENU_RECOMENDACIONES)
+        opcion = _pedir_entero("Opcion: ")
+
+        if opcion == 0:
+            return
+        if opcion == 1:
+            nombre = input("Nombre del usuario: ")
+            generos_preferidos = _pedir_lista("Generos preferidos (separados por coma): ")
+            directores_preferidos = _pedir_lista("Directores preferidos (separados por coma): ")
+            actores_preferidos = _pedir_lista("Actores preferidos (separados por coma): ")
+            perfil_usuario = recomendaciones.crear_perfil_usuario(
+                nombre, generos_preferidos, directores_preferidos, actores_preferidos
+            )
+            print("Perfil creado.")
+            continue
+
+        if perfil_usuario is None:
+            print("Primero hay que crear un perfil de usuario (opcion 1).")
+            continue
+
+        if opcion == 2:
+            resultado = recomendaciones.filtrar_peliculas_por_gustos(catalogo, perfil_usuario)
+        elif opcion == 3:
+            campo = input("Campo de puntuacion (vote_average, popularity): ")
+            cantidad = _pedir_entero("Cantidad de recomendaciones: ")
+            resultado = recomendaciones.recomendar_por_ranking(catalogo, perfil_usuario, campo, cantidad)
+        elif opcion == 4:
+            cantidad = _pedir_entero("Cantidad de recomendaciones: ")
+            resultado = recomendaciones.recomendar_al_azar(catalogo, perfil_usuario, cantidad)
+        else:
+            print("Opcion invalida.")
+            continue
+
+        _mostrar_resultado(resultado)
 
 
 # Parametros: ninguno.
 # Retorna:
 #   None.
-# Flujo esperado:
-#   1. Cargar el catalogo una vez al inicio con crud.cargar_catalogo(RUTA_DATOS).
-#   2. En un bucle (while), mostrar_menu() y leer la opcion elegida (int, con
-#      manejo de errores si el usuario ingresa algo no numerico).
-#   3. Segun la opcion, pedir los datos adicionales que haga falta (texto de
-#      busqueda, id de pelicula, campos a editar, gustos del usuario, etc.) y
-#      llamar a la funcion correspondiente del modulo indicado en el
-#      comentario de MENU_OPCIONES / mas arriba en este archivo.
-#   4. Mostrar el resultado devuelto por esa funcion (lista de peliculas,
-#      diccionario de promedios, ranking, recomendaciones, etc.).
-#   5. Las operaciones que modifican el catalogo (crear/editar/eliminar
-#      pelicula) deben persistirse llamando a crud.guardar_catalogo(catalogo, RUTA_DATOS).
-#   6. Terminar el bucle cuando el usuario elija la opcion 0 (Salir).
+# Flujo:
+#   1. Carga el catalogo una vez con crud.cargar_catalogo(RUTA_DATOS).
+#   2. Muestra el menu principal en un bucle y deriva cada opcion al submenu
+#      del modulo correspondiente (busqueda, crud, rankings, estadisticas,
+#      recomendaciones).
+#   3. Al salir (opcion 0), persiste el catalogo con crud.guardar_catalogo.
 def main() -> None:
-    pass  # TODO: implementar
+    catalogo = crud.cargar_catalogo(RUTA_DATOS) or []
+
+    while True:
+        print("\n=== Catalogo de Peliculas ===")
+        mostrar_menu(MENU_PRINCIPAL)
+        opcion = _pedir_entero("Opcion: ")
+
+        if opcion == 0:
+            crud.guardar_catalogo(catalogo, RUTA_DATOS)
+            print("Hasta la proxima.")
+            break
+        elif opcion == 1:
+            menu_busqueda(catalogo)
+        elif opcion == 2:
+            catalogo = menu_crud(catalogo)
+        elif opcion == 3:
+            menu_rankings(catalogo)
+        elif opcion == 4:
+            menu_estadisticas(catalogo)
+        elif opcion == 5:
+            menu_recomendaciones(catalogo)
+        else:
+            print("Opcion invalida.")
 
 
 if __name__ == "__main__":
