@@ -437,3 +437,45 @@ todavia no lo reviso).
 `fix/crud-value-error-en-menu` (ya tenia el fix de `menu_crud` sin
 commitear), en vez de crear una rama nueva, porque el usuario todavia no
 habia commiteado ese trabajo previo.
+
+---
+
+### Entrada 10 — 2026-09-25
+
+**Prompt del usuario:**
+> arma un manual de usuario en md para el repositorio
+
+**Respuesta / propuesta de la IA:**
+Se creo `MANUAL_USUARIO.md` en la raiz del repo: una guia de uso de la
+aplicacion de consola (no de instalacion/desarrollo, eso lo sigue cubriendo
+el README), pensada para quien va a usar `main.py` sin conocer el codigo.
+Cubre: como arrancar la app, recorrido del menu principal, cada submenu
+(Busqueda, CRUD, Rankings, Estadisticas, Recomendaciones) con ejemplos de
+interaccion por consola, cuando se guardan los cambios, y una seccion de
+"Problemas comunes" con los mensajes de error reales que puede mostrar la
+app (incluye el mensaje de `ValueError` capturado en el CRUD, de la Entrada
+8). Se marco explicitamente que Rankings todavia no esta implementado
+(devuelve `(sin resultado)` en todas sus opciones), para no confundir a
+quien lea el manual. Se agrego un parrafo en el `README.md` linkeando al
+manual.
+
+**Decision del usuario:** Pendiente de confirmacion (el usuario todavia no
+lo reviso).
+
+**Como se comprobo que funciona:** no aplica "correr tests" porque es un
+documento, no codigo, pero se verificaron los datos concretos que aparecen
+en los ejemplos contra el comportamiento real de la aplicacion antes de
+darlos por buenos:
+1. El ejemplo de busqueda por actor ("tom hanks") se corrio contra
+   `busqueda.buscar_por_actor` real: 71 resultados totales, los primeros 3
+   en el orden real ("Toy Story", "Apollo 13", "Forrest Gump"), y el aviso
+   de "... y 51 peliculas mas." (71 - 20 mostradas).
+2. El ejemplo de busqueda combinada (genero Comedy + actor Tom Hanks + años
+   1990-2000) se corrio contra `busqueda.busqueda_combinada` real y da 9
+   resultados no vacios.
+3. El mensaje de error de id duplicado se tomo literal de una excepcion real
+   (`crud.crear_pelicula` con el id 862, que ya existe en el dataset real:
+   "Toy Story").
+4. Los numeros del resumen estadistico de ejemplo (`total_peliculas: 45433`,
+   `promedio_vote_average: 5.62`, etc.) son los mismos ya verificados en la
+   Entrada 4 contra el dataset completo.

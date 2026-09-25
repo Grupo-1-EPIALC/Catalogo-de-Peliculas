@@ -4,6 +4,10 @@ Catalogo de Peliculas para TP de Elementos de Programacion IA & Low Code.
 
 > Proyecto en construccion: este README se ira completando a medida que avance el trabajo.
 
+> Para instrucciones de uso de la aplicacion (que hace cada opcion del menu,
+> ejemplos, errores comunes), ver el [Manual de usuario](MANUAL_USUARIO.md).
+> Este README cubre el setup del entorno y el dataset.
+
 ## Entorno de desarrollo
 
 El proyecto usa un entorno virtual de Python (`.venv`) con las siguientes librerias base:
