@@ -133,7 +133,6 @@ El reparto queda asi:
 * Dario - crud.py
 * Elian - busqueda.py
 * Lucho - rankings.py
-* Leonardo - recomendaciones.py o main.py (de acuerdo a tu nivel)
-* Andres - estadisticas.py y main.py o recomendaciones.py
 
+* Andres - estadisticas.py, recomendaciones.py y main.py o 
 ### Recuerden que deberia estar subido al repo el jueves a la noche a mas tardar
