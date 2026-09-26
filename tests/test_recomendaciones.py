@@ -186,6 +186,22 @@ class TestComparacionNormalizada:
         perfil = recomendaciones.crear_perfil_usuario("Andres", ["   "], [], [], [])
         assert recomendaciones.calcular_afinidad(catalogo_recomendaciones[0], perfil) == 0
 
+    def test_afinidad_traduce_genero_en_castellano(self, catalogo_recomendaciones):
+        # el mismo bug de consistencia, pero de idioma: filtrar_peliculas_por_gustos
+        # encuentra la pelicula via busqueda.buscar_por_genero (que ya traduce),
+        # asi que calcular_afinidad tiene que reconocer la misma coincidencia
+        perfil = recomendaciones.crear_perfil_usuario("Andres", ["animacion"], [], [], [])
+        # peli 1: genres ["Animation", "Comedy"]
+        assert recomendaciones.calcular_afinidad(catalogo_recomendaciones[0], perfil) == 1
+
+    def test_traduccion_no_genera_falsos_positivos_en_otras_categorias(self, catalogo_recomendaciones):
+        # "terror" como preferencia de actor se traduce igual a "Horror"
+        # (la funcion no sabe que categoria esta comparando), pero "horror"
+        # no es substring de ningun cast de la pelicula 1 (ActorX, ActorY),
+        # asi que no debe generar una coincidencia falsa
+        perfil = recomendaciones.crear_perfil_usuario("Andres", [], [], ["terror"], [])
+        assert recomendaciones.calcular_afinidad(catalogo_recomendaciones[0], perfil) == 0
+
 
 class TestFiltrarPeliculasPorGustos:
     def test_devuelve_solo_coincidencias(self, catalogo_recomendaciones, perfil, campos_preferencia_fake):

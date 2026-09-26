@@ -72,22 +72,34 @@ Busca películas que ya existen en el catálogo. Nunca modifica nada.
 
 Las búsquedas **no distinguen mayúsculas de minúsculas ni tildes**, y
 encuentran coincidencias parciales. Por ejemplo, buscar por actor "hanks"
-encuentra a "Tom Hanks", y buscar género "comedia" no encontraría nada
-porque el dataset usa los nombres en inglés ("Comedy").
+encuentra a "Tom Hanks".
 
-Ejemplo — buscar por actor:
+**Buscar por género acepta castellano o inglés.** El dataset tiene los
+géneros en inglés ("Comedy", "Horror", etc.), pero si escribís el nombre en
+castellano ("comedia", "terror") y no hay coincidencia directa, la
+aplicación prueba automáticamente la traducción antes de decir que no
+encontró nada (ver `categorias_traducciones.json`). Esto aplica a la opción
+4 (Buscar por género) y al filtro "genero" de la búsqueda combinada (opción
+8); también a las opciones de género en Rankings y a los géneros preferidos
+en Recomendaciones.
+
+Ejemplo — buscar por actor (a partir de la opción 2 en adelante, salvo
+título, se muestra un listado compacto con el `id` de cada película, útil
+para después verla en detalle con CRUD → opción 1):
 
 ```
 Opcion: 2
 Nombre del actor: tom hanks
-- Toy Story
-- Apollo 13
-- Forrest Gump
+- Apollo 13 (1995) [id: 568]
+- Forrest Gump (1994) [id: 13]
+- Philadelphia (1993) [id: 9800]
 ... y 51 peliculas mas.
 ```
 
 Si hay más de 20 resultados, se muestran los primeros 20 y un aviso de
-cuántos quedaron afuera (para no inundar la pantalla).
+cuántos quedaron afuera (para no inundar la pantalla). La búsqueda por
+título (opción 1) es la excepción: muestra la ficha completa de cada
+resultado directamente, porque suele haber pocas coincidencias.
 
 La opción 8 (**búsqueda combinada**) te deja combinar varios filtros a la
 vez (todos deben cumplirse, no alcanza con uno solo). Dejá vacío cualquier
@@ -188,12 +200,8 @@ modifica nada.
 
 ## 5. Rankings (opción 3)
 
-> **Estado actual: pendiente de implementación.** El submenú de Rankings
-> existe y se puede navegar, pero por ahora todas sus opciones devuelven
-> `(sin resultado)` porque la lógica en `rankings.py` todavía no está
-> escrita. Cuando se implemente, esta sección del manual se va a actualizar.
-
-Cuando esté implementado, vas a poder ver:
+Muestra las mejores películas (o categorías) según distintos criterios de
+puntuación. No modifica nada.
 
 ```
 --- Rankings ---
@@ -210,6 +218,40 @@ Cuando esté implementado, vas a poder ver:
 Los campos de puntuación válidos para estas opciones son `vote_average`
 (puntaje 0 a 10), `popularity` (índice de popularidad) y `vote_count`
 (cantidad de votos).
+
+Las opciones **1 a 4** ("Top películas...") devuelven películas individuales
+ordenadas de mayor a menor puntaje. La opción 2 (por género) acepta el
+género en castellano o inglés, igual que en Búsqueda.
+
+```
+Opcion: 1
+Campo de puntuacion (vote_average, popularity, vote_count): vote_average
+Cantidad de peliculas: 3
+- Reckless
+- Girl in the Cadillac
+- The Haunted World of Edward D. Wood, Jr.
+```
+
+Las opciones **5 a 7** ("Ranking de...") no devuelven películas sino un
+promedio por categoría (género, actor o director), ordenado de mayor a
+menor. Para actor y director hay que indicar un **mínimo de películas**: una
+persona con menos películas que ese mínimo no entra en el ranking, para que
+un actor con una sola película puntuada 10 no aparezca primero.
+
+```
+Opcion: 5
+Campo de puntuacion: vote_average
+- ('Animation', 6.28)
+- ('History', 6.15)
+- ('War', 6.04)
+- ('Drama', 5.91)
+- ('Music', 5.88)
+...
+```
+
+> El formato de esta lista (`- (genero, promedio)`) es el que muestra la
+> aplicación tal cual hoy; es un poco crudo (tupla de Python sin formatear)
+> pero es fiel a lo que vas a ver en pantalla.
 
 ## 6. Estadísticas (opción 4)
 
@@ -316,8 +358,7 @@ mensaje después de los dos puntos explica exactamente qué pasó. El catálogo
 no se modificó; podés volver a intentar con otro id o valor.
 
 **"(sin resultado)"** — La búsqueda, ranking o consulta no encontró nada
-que coincida (o, en el caso de Rankings, la funcionalidad todavía no está
-implementada — ver sección 5).
+que coincida con lo que pediste.
 
 **"Ingrese un numero entero valido."** — Se esperaba un número (por
 ejemplo, un id o una cantidad) y se escribió otra cosa. Volvé a escribir

@@ -8,9 +8,14 @@ automaticamente si el busqueda.py local sigue siendo el stub original (ver
 real.
 """
 
+import json
+from pathlib import Path
+
 import pytest
 
 import busqueda
+
+RUTA_DATASET_REAL = Path(__file__).resolve().parent.parent / "data" / "movies_unified.json"
 
 
 def _busqueda_implementada() -> bool:
@@ -159,3 +164,74 @@ class TestFlagResumen:
         resultado = busqueda.busqueda_combinada(catalogo_prueba, {}, resumen=True)
         assert len(resultado) == len(catalogo_prueba)
         assert all(set(resumen) == {"id", "title", "anio", "genres"} for resumen in resultado)
+
+
+class TestTraduccionDeCategorias:
+    """buscar_por_genero primero busca el valor tal cual; si no encuentra
+    nada, traduce de castellano a ingles (categorias_traducciones.json) y
+    repite la busqueda antes de devolver [] ("no encontrado")."""
+
+    def test_diccionario_se_cargo_desde_el_json(self):
+        assert busqueda.CATEGORIAS_EN_A_ES.get("Action") == "Acción"
+        assert busqueda.CATEGORIAS_EN_A_ES.get("Horror") == "Terror"
+
+    def test_traducir_a_ingles_encuentra_ignorando_mayusculas_y_tildes(self):
+        assert busqueda.traducir_categoria_a_ingles("terror") == "Horror"
+        assert busqueda.traducir_categoria_a_ingles("TERROR") == "Horror"
+        assert busqueda.traducir_categoria_a_ingles("Ciencia Ficción") == "Science Fiction"
+
+    def test_traducir_a_ingles_sin_coincidencia_devuelve_none(self):
+        assert busqueda.traducir_categoria_a_ingles("no es una categoria") is None
+
+    def test_buscar_por_genero_no_necesita_traducir_si_ya_matchea(self, catalogo_prueba):
+        # "Action" ya esta en el catalogo tal cual: no deberia hacer falta
+        # traducir para encontrarlo
+        resultado = busqueda.buscar_por_genero(catalogo_prueba, "Action")
+        assert [p["id"] for p in resultado] == [4]
+
+    def test_buscar_por_genero_traduce_cuando_no_encuentra_nada_directo(self, catalogo_prueba):
+        # la pelicula 4 tiene genero "Action"; "accion" no aparece en el
+        # catalogo tal cual, asi que debe traducirse a "Action" y reintentar
+        resultado = busqueda.buscar_por_genero(catalogo_prueba, "accion")
+        assert [p["id"] for p in resultado] == [4]
+
+    def test_buscar_por_genero_sin_match_ni_traduccion_devuelve_vacio(self, catalogo_prueba):
+        assert busqueda.buscar_por_genero(catalogo_prueba, "xyz-no-existe") == []
+
+    def test_busqueda_combinada_hereda_la_traduccion_de_genero(self, catalogo_prueba):
+        # busqueda_combinada llama a buscar_por_genero internamente, asi que
+        # la traduccion deberia funcionar igual a traves de ella
+        resultado = busqueda.busqueda_combinada(catalogo_prueba, {"genero": "accion"})
+        assert [p["id"] for p in resultado] == [4]
+
+
+@pytest.mark.skipif(
+    not RUTA_DATASET_REAL.exists(),
+    reason="data/movies_unified.json no existe: correr eda dataset.ipynb primero",
+)
+class TestTraduccionDeCategoriasFuncional:
+    """Compara, contra el dataset real completo, que buscar por el nombre en
+    castellano de cada genero devuelva exactamente las mismas peliculas que
+    buscar por el nombre en ingles."""
+
+    @classmethod
+    @pytest.fixture(scope="class")
+    def catalogo_real(cls) -> list[dict]:
+        with open(RUTA_DATASET_REAL, encoding="utf-8") as archivo:
+            return json.load(archivo)
+
+    @pytest.mark.parametrize(
+        "genero_es, genero_en",
+        [
+            ("terror", "Horror"),
+            ("comedia", "Comedy"),
+            ("Ciencia Ficción", "Science Fiction"),
+            ("bélica", "War"),
+            ("animación", "Animation"),
+        ],
+    )
+    def test_busqueda_en_castellano_encuentra_lo_mismo_que_en_ingles(self, catalogo_real, genero_es, genero_en):
+        resultado_es = busqueda.buscar_por_genero(catalogo_real, genero_es)
+        resultado_en = busqueda.buscar_por_genero(catalogo_real, genero_en)
+        assert resultado_es != []
+        assert {p["id"] for p in resultado_es} == {p["id"] for p in resultado_en}

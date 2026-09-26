@@ -55,7 +55,8 @@ El notebook unifica `movies_metadata.csv`, `credits.csv` y `keywords.csv` en un 
 - `eda dataset.ipynb`: descarga y unificacion del dataset.
 - `data/`: dataset crudo y unificado (generado localmente, ignorado por git).
 - `crud.py`: alta, baja, modificacion y consulta de peliculas.
-- `busqueda.py`: busqueda y filtrado (titulo, actor, director, genero, pais, idioma).
+- `busqueda.py`: busqueda y filtrado (titulo, actor, director, genero, pais, idioma). Busca por genero en castellano o ingles, usando `categorias_traducciones.json`.
+- `categorias_traducciones.json`: diccionario ingles -> castellano de generos, usado por `busqueda.buscar_por_genero`.
 - `rankings.py`: top peliculas y rankings por genero/actor/director.
 - `estadisticas.py`: promedios e indicadores por categoria.
 - `recomendaciones.py`: perfil de usuario y recomendaciones (ranking / al azar).

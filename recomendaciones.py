@@ -118,12 +118,22 @@ def _normalizar(texto: str) -> str:
 #       coincidencia que busqueda.py, para que una pelicula encontrada por
 #       filtrar_peliculas_por_gustos nunca de afinidad 0 con la preferencia
 #       que la hizo coincidir (ej. el usuario escribe "tom hanks" y la
-#       pelicula tiene "Tom Hanks").
+#       pelicula tiene "Tom Hanks"). Si no hay coincidencia directa, prueba
+#       ademas si `preferencia` es un genero en castellano
+#       (`busqueda.traducir_categoria_a_ingles`) y compara con esa
+#       traduccion; para director/actor/idioma esto no encuentra nada (el
+#       diccionario es solo de generos) y no cambia el resultado.
 def _preferencia_coincide_con_valor(preferencia: str, valor_pelicula: str) -> bool:
     preferencia_norm = _normalizar(preferencia)
     if not preferencia_norm:
         return False
-    return preferencia_norm in _normalizar(valor_pelicula)
+    if preferencia_norm in _normalizar(valor_pelicula):
+        return True
+
+    preferencia_traducida = busqueda.traducir_categoria_a_ingles(preferencia)
+    if preferencia_traducida is None:
+        return False
+    return _normalizar(preferencia_traducida) in _normalizar(valor_pelicula)
 
 
 # Parametros:

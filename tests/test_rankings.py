@@ -86,3 +86,17 @@ class TestRankingGenerosActoresDirectores:
 
     def test_catalogo_vacio_devuelve_lista_vacia(self):
         assert rankings.ranking_generos([], "vote_average") == []
+
+
+class TestTraduccionDeGeneroEnTopPorGenero:
+    """top_por_genero reutiliza busqueda.traducir_categoria_a_ingles: si el
+    genero tal cual no encuentra nada, prueba su traduccion de castellano a
+    ingles antes de devolver []."""
+
+    def test_genero_en_castellano_encuentra_lo_mismo_que_en_ingles(self, catalogo_rankings):
+        resultado_es = rankings.top_por_genero(catalogo_rankings, "comedia", "vote_average", 2)
+        resultado_en = rankings.top_por_genero(catalogo_rankings, "Comedy", "vote_average", 2)
+        assert [p["id"] for p in resultado_es] == [p["id"] for p in resultado_en] == [3, 4]
+
+    def test_genero_sin_match_ni_traduccion_devuelve_vacio(self, catalogo_rankings):
+        assert rankings.top_por_genero(catalogo_rankings, "xyz-no-existe", "vote_average", 5) == []
