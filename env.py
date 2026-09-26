@@ -12,9 +12,8 @@ Variables que contiene:
 - RUTA_PERFILES
 """
 
-# Catalogo de peliculas. Se usa la muestra representativa (mas liviana que
-# el dataset completo) como archivo por defecto de la aplicacion.
-RUTA_DATOS = "data/movies_sample_representativa.json"
+# Catalogo unificado generado por `eda dataset.ipynb`.
+RUTA_DATOS = "data/movies_unified.json"
 
 # Perfiles de usuario de recomendaciones.py (ver el docstring de ese modulo).
 RUTA_PERFILES = "data/perfiles_usuario.json"

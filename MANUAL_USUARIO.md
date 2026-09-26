@@ -215,9 +215,19 @@ puntuación. No modifica nada.
 0. Volver al menu principal
 ```
 
-Los campos de puntuación válidos para estas opciones son `vote_average`
-(puntaje 0 a 10), `popularity` (índice de popularidad) y `vote_count`
-(cantidad de votos).
+Al pedir el campo de puntuación, elegí una opción del selector:
+
+```
+1. vote_average
+2. popularity
+3. vote_count
+Opcion (1-3): 2
+Campo seleccionado: popularity
+```
+
+`vote_average` es el puntaje promedio de usuarios (0 a 10), `popularity` es
+el índice de popularidad y `vote_count` es la cantidad de votos. Si ingresás
+una opción fuera del selector, se vuelve a pedir.
 
 Las opciones **1 a 4** ("Top películas...") devuelven películas individuales
 ordenadas de mayor a menor puntaje. La opción 2 (por género) acepta el
@@ -225,7 +235,10 @@ género en castellano o inglés, igual que en Búsqueda.
 
 ```
 Opcion: 1
-Campo de puntuacion (vote_average, popularity, vote_count): vote_average
+1. vote_average
+2. popularity
+3. vote_count
+Campo de puntuacion: 1
 Cantidad de peliculas: 3
 - Reckless
 - Girl in the Cadillac
@@ -240,7 +253,10 @@ un actor con una sola película puntuada 10 no aparezca primero.
 
 ```
 Opcion: 5
-Campo de puntuacion: vote_average
+1. vote_average
+2. popularity
+3. vote_count
+Campo de puntuacion: 1
 - ('Animation', 6.28)
 - ('History', 6.15)
 - ('War', 6.04)

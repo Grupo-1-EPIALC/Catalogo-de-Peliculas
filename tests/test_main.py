@@ -45,6 +45,38 @@ class TestPedirLista:
         assert main._pedir_lista("Generos: ") == ["Drama", "Comedy"]
 
 
+class TestPedirCampoPuntuacionRanking:
+    def test_devuelve_el_campo_de_la_opcion_elegida(self, monkeypatch, capsys):
+        monkeypatch.setattr(builtins, "input", lambda _: "2")
+        assert main._pedir_campo_puntuacion_ranking() == "popularity"
+        salida = capsys.readouterr().out
+        assert "Seleccione el campo de puntuacion:" in salida
+        assert "1. vote_average" in salida
+        assert "2. popularity" in salida
+        assert "3. vote_count" in salida
+        assert "Campo seleccionado: popularity" in salida
+
+    def test_reintenta_si_la_opcion_no_existe(self, monkeypatch, capsys):
+        respuestas = iter(["8", "3"])
+        monkeypatch.setattr(builtins, "input", lambda _: next(respuestas))
+        assert main._pedir_campo_puntuacion_ranking() == "vote_count"
+        assert "Opcion invalida" in capsys.readouterr().out
+
+    def test_menu_rankings_pasa_el_campo_elegido_al_top_por_actor(self, monkeypatch):
+        respuestas = iter(["3", "Gary Oldman", "2", "10", "0"])
+        llamada = {}
+        monkeypatch.setattr(builtins, "input", lambda _: next(respuestas))
+
+        def top_por_actor(catalogo, actor, campo, cantidad):
+            llamada.update(actor=actor, campo=campo, cantidad=cantidad)
+            return []
+
+        monkeypatch.setattr(main.rankings, "top_por_actor", top_por_actor)
+        main.menu_rankings([])
+
+        assert llamada == {"actor": "Gary Oldman", "campo": "popularity", "cantidad": 10}
+
+
 class TestMostrarResultado:
     def test_resultado_none(self, capsys):
         main._mostrar_resultado(None)

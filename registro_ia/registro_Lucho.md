@@ -27,3 +27,19 @@ Se propuso que los rankings de géneros, actores y directores devuelvan promedio
 **Si fue modificado o rechazado:** Sin modificaciones.
 
 **Cómo se comprobó que funciona:** Se probaron las tres funciones con promedios cercanos que se muestran como `7.5`; los resultados devuelven dos decimales y mantienen el orden determinado por el promedio completo. La verificación pasó.
+
+### Entrada 3 — 2026-09-26 15:17
+
+**Prompt del usuario:**
+> "podemos hacer una especie de select box (un desplegable) con las opciones para cuando pide Campo de puntuacion para los rankings"
+
+**Respuesta / propuesta de la IA:**
+Como la interfaz es de consola, se propuso un selector numerado equivalente. Se agregó una opción compartida con `vote_average`, `popularity` y `vote_count` en las siete operaciones de rankings, con reintento si se ingresa una opción fuera del rango. También se actualizaron las pruebas de `main.py` y el ejemplo de Rankings del manual.
+
+**Decisión del usuario:** Aceptado
+
+**Si fue modificado o rechazado:** Sin modificaciones.
+
+**Cómo se comprobó que funciona:** Se ejecutó el flujo de `menu_rankings` para "Gary Oldman", se eligió la opción `2` y se confirmó que `top_por_actor` recibió `popularity` y la cantidad `10`. También se comprobó que una opción inválida se rechaza y vuelve a solicitarse. Pylance no reportó errores en `main.py` ni en `tests/test_main.py`. No se ejecutó pytest porque no está instalado en el intérprete configurado.
+
+Tras el reporte de que la selección devolvía al menú principal, se simuló la navegación completa desde `main()`: la opción `2` muestra el campo seleccionado, ejecuta el ranking y vuelve a mostrar el submenú de Rankings; solo se retorna al menú principal al ingresar `0` en ese submenú. Se aclaró el prompt del selector y se añadió confirmación visual del campo seleccionado.
