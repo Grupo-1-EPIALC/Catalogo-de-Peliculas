@@ -82,6 +82,12 @@ MENU_RANKINGS: dict[int, str] = {
     0: "Volver al menu principal",
 }
 
+CAMPOS_PUNTUACION_RANKINGS: dict[int, str] = {
+    1: "vote_average",
+    2: "popularity",
+    3: "vote_count",
+}
+
 # estadisticas.py
 MENU_ESTADISTICAS: dict[int, str] = {
     1: "Genero",
@@ -129,6 +135,18 @@ def _pedir_entero(mensaje: str) -> int:
 def _pedir_lista(mensaje: str) -> list[str]:
     texto = input(mensaje)
     return [valor.strip() for valor in texto.split(",") if valor.strip()]
+
+
+def _pedir_campo_puntuacion_ranking() -> str:
+    while True:
+        print("\nSeleccione el campo de puntuacion:")
+        mostrar_menu(CAMPOS_PUNTUACION_RANKINGS)
+        opcion = _pedir_entero("Opcion (1-3): ")
+        if opcion in CAMPOS_PUNTUACION_RANKINGS:
+            campo = CAMPOS_PUNTUACION_RANKINGS[opcion]
+            print(f"Campo seleccionado: {campo}")
+            return campo
+        print("Opcion invalida. Seleccione 1, 2 o 3.")
 
 
 # Cantidad maxima de filas que se imprimen por consola en un solo resultado.
@@ -375,33 +393,33 @@ def menu_rankings(catalogo: list[dict]) -> None:
         if opcion == 0:
             return
         if opcion == 1:
-            campo = input("Campo de puntuacion (vote_average, popularity, vote_count): ")
+            campo = _pedir_campo_puntuacion_ranking()
             cantidad = _pedir_entero("Cantidad de peliculas: ")
             resultado = rankings.top_peliculas(catalogo, campo, cantidad)
         elif opcion == 2:
             genero = input("Genero: ")
-            campo = input("Campo de puntuacion: ")
+            campo = _pedir_campo_puntuacion_ranking()
             cantidad = _pedir_entero("Cantidad de peliculas: ")
             resultado = rankings.top_por_genero(catalogo, genero, campo, cantidad)
         elif opcion == 3:
             actor = input("Actor: ")
-            campo = input("Campo de puntuacion: ")
+            campo = _pedir_campo_puntuacion_ranking()
             cantidad = _pedir_entero("Cantidad de peliculas: ")
             resultado = rankings.top_por_actor(catalogo, actor, campo, cantidad)
         elif opcion == 4:
             director = input("Director: ")
-            campo = input("Campo de puntuacion: ")
+            campo = _pedir_campo_puntuacion_ranking()
             cantidad = _pedir_entero("Cantidad de peliculas: ")
             resultado = rankings.top_por_director(catalogo, director, campo, cantidad)
         elif opcion == 5:
-            campo = input("Campo de puntuacion: ")
+            campo = _pedir_campo_puntuacion_ranking()
             resultado = rankings.ranking_generos(catalogo, campo)
         elif opcion == 6:
-            campo = input("Campo de puntuacion: ")
+            campo = _pedir_campo_puntuacion_ranking()
             minimo = _pedir_entero("Minimo de peliculas por actor: ")
             resultado = rankings.ranking_actores(catalogo, campo, minimo)
         elif opcion == 7:
-            campo = input("Campo de puntuacion: ")
+            campo = _pedir_campo_puntuacion_ranking()
             minimo = _pedir_entero("Minimo de peliculas por director: ")
             resultado = rankings.ranking_directores(catalogo, campo, minimo)
         else:
