@@ -211,3 +211,68 @@ class TestMenuCrudFuncional:
 
         assert len(resultado) == 2
         assert any(p["id"] == 2 and p["title"] == "Pelicula Nueva" for p in resultado)
+
+
+# NOTA (Elian, PR #10): estos tests quedaron salteados a proposito. Cubren el
+# display de ficha-detallada vs. listado que main.py todavia no implementa
+# (menu_busqueda aun no pasa resumen=True ni tiene los helpers de mostrado).
+# Cuando se cablee main.py, hay que refactorizarlos contra los nombres
+# finales de esos helpers y quitar el skip.
+@pytest.mark.skip(reason="requiere el cableado de resumen=True en menu_busqueda (PR #10 solo toca busqueda.py)")
+class TestMostrarListadoYDetallePeliculas:
+    """Helpers futuros del submenu de busqueda: el listado compacto (con id)
+    y la ficha detallada de la busqueda por titulo."""
+
+    def test_listado_muestra_titulo_anio_e_id(self, capsys):
+        main._mostrar_listado_peliculas([
+            {"id": 1, "title": "Toy Story", "anio": 1995, "genres": ["Comedy"]},
+        ])
+        assert "- Toy Story (1995) [id: 1]" in capsys.readouterr().out
+
+    def test_listado_sin_anio_omite_el_parentesis(self, capsys):
+        main._mostrar_listado_peliculas([
+            {"id": 5, "title": "Sin Datos", "anio": None, "genres": []},
+        ])
+        assert "- Sin Datos [id: 5]" in capsys.readouterr().out
+
+    def test_listado_vacio(self, capsys):
+        main._mostrar_listado_peliculas([])
+        assert "sin resultado" in capsys.readouterr().out
+
+    def test_detalle_muestra_ficha_completa(self, catalogo_prueba, capsys):
+        main._mostrar_detalle_peliculas([catalogo_prueba[0]])
+        salida = capsys.readouterr().out
+        assert "[1] Toy Story (1995)" in salida
+        assert "Animation, Comedy, Family" in salida
+        assert "John Lasseter" in salida
+        assert "Juguetes con vida propia." in salida
+
+    def test_detalle_sin_resultado(self, capsys):
+        main._mostrar_detalle_peliculas([])
+        assert "sin resultado" in capsys.readouterr().out
+
+
+@pytest.mark.skip(reason="requiere el cableado de resumen=True en menu_busqueda (PR #10 solo toca busqueda.py)")
+class TestMenuBusquedaFuncional:
+    """menu_busqueda end-to-end contra busqueda.py real: la opcion 1 (titulo)
+    muestra la ficha detallada y la opcion 2 (actor) el listado con id."""
+
+    def test_buscar_por_titulo_muestra_detalle(self, catalogo_prueba, monkeypatch, capsys):
+        respuestas = iter(["1", "toy story", "0"])
+        monkeypatch.setattr(builtins, "input", lambda _: next(respuestas))
+
+        main.menu_busqueda(catalogo_prueba)
+
+        salida = capsys.readouterr().out
+        assert "[1] Toy Story (1995)" in salida
+        assert "Juguetes con vida propia." in salida
+
+    def test_buscar_por_actor_muestra_listado_con_id(self, catalogo_prueba, monkeypatch, capsys):
+        respuestas = iter(["2", "tom hanks", "0"])
+        monkeypatch.setattr(builtins, "input", lambda _: next(respuestas))
+
+        main.menu_busqueda(catalogo_prueba)
+
+        salida = capsys.readouterr().out
+        assert "- Toy Story (1995) [id: 1]" in salida
+        assert "- Toy Story 2 (1999) [id: 2]" in salida

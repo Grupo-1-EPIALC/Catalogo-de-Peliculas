@@ -9,7 +9,15 @@ cumplen el criterio pedido.
 Las comparaciones de texto ignoran mayusculas/minusculas, tildes y espacios
 extra. Un criterio vacio (solo espacios) no coincide con nada y devuelve [].
 
+Formato de los resultados: por defecto cada funcion devuelve el objeto
+completo de cada pelicula. Con ``resumen=True`` devuelven un listado compacto
+(ver ``resumir_pelicula``): util cuando hay muchas coincidencias y para que el
+usuario anote el ``id`` y vea el detalle despues (ej. ``crud`` opcion 1).
+``recomendaciones.py`` usa estas funciones con el formato completo (por
+defecto), porque necesita leer varios campos de cada pelicula.
+
 Funciones que contiene:
+- resumir_pelicula
 - buscar_por_titulo
 - buscar_por_actor
 - buscar_por_director
@@ -61,15 +69,44 @@ def _anio_estreno(pelicula: dict) -> int | None:
         return None
 
 
-def buscar_por_titulo(catalogo: list[dict], texto: str) -> list[dict]:
+def resumir_pelicula(pelicula: dict) -> dict:
+    """Arma la ficha compacta de una pelicula para mostrar listados.
+
+    Se usa con ``resumen=True`` en las funciones de busqueda, cuando hay
+    muchas coincidencias y el objeto completo inundaria la pantalla. El
+    ``id`` permite ver el detalle completo despues (ej. ``crud`` opcion 1,
+    "Ver pelicula por id").
+
+    Parametros:
+        pelicula (dict): pelicula del catalogo (objeto completo).
+
+    Retorna:
+        dict: ``{"id": ..., "title": ..., "anio": ... | None,
+            "genres": [...]}``. ``anio`` sale de ``release_date`` (``None``
+            si no hay fecha valida) y ``genres`` es una copia de la lista
+            original (no un alias); si no es una lista, queda ``[]``.
+    """
+    generos = pelicula.get("genres")
+    return {
+        "id": pelicula.get("id"),
+        "title": pelicula.get("title"),
+        "anio": _anio_estreno(pelicula),
+        "genres": list(generos) if isinstance(generos, list) else [],
+    }
+
+
+def buscar_por_titulo(catalogo: list[dict], texto: str, resumen: bool = False) -> list[dict]:
     """Busca peliculas cuyo titulo contiene el texto indicado.
 
     Coincide si ``texto`` aparece en ``title`` o en ``original_title``
-    (coincidencia parcial).
+    (coincidencia parcial). Es la busqueda que devuelve el objeto completo
+    de cada pelicula, para mostrar su ficha detallada.
 
     Parametros:
         catalogo (list[dict]): lista de peliculas del catalogo.
         texto (str): texto (o parte del texto) a buscar en el titulo.
+        resumen (bool): si es True, devuelve el listado compacto de
+            ``resumir_pelicula`` en vez del objeto completo. Por defecto False.
 
     Retorna:
         list[dict]: peliculas cuyo ``title`` u ``original_title`` contienen
@@ -78,20 +115,25 @@ def buscar_por_titulo(catalogo: list[dict], texto: str) -> list[dict]:
     texto_norm = _normalizar(texto)
     if not texto_norm:
         return []
-    return [
+    encontradas = [
         pelicula
         for pelicula in catalogo
         if texto_norm in _normalizar(pelicula.get("title") or "")
         or texto_norm in _normalizar(pelicula.get("original_title") or "")
     ]
+    if resumen:
+        return [resumir_pelicula(pelicula) for pelicula in encontradas]
+    return encontradas
 
 
-def buscar_por_actor(catalogo: list[dict], nombre_actor: str) -> list[dict]:
+def buscar_por_actor(catalogo: list[dict], nombre_actor: str, resumen: bool = False) -> list[dict]:
     """Busca peliculas en las que participa un actor o actriz.
 
     Parametros:
         catalogo (list[dict]): lista de peliculas del catalogo.
         nombre_actor (str): nombre (o parte del nombre) a buscar en ``cast``.
+        resumen (bool): si es True, devuelve el listado compacto de
+            ``resumir_pelicula`` en vez del objeto completo. Por defecto False.
 
     Retorna:
         list[dict]: peliculas donde algun elemento de ``cast`` contiene
@@ -101,20 +143,25 @@ def buscar_por_actor(catalogo: list[dict], nombre_actor: str) -> list[dict]:
     nombre_norm = _normalizar(nombre_actor)
     if not nombre_norm:
         return []
-    return [
+    encontradas = [
         pelicula
         for pelicula in catalogo
         if isinstance(pelicula.get("cast"), list)
         and any(nombre_norm in _normalizar(nombre or "") for nombre in pelicula["cast"])
     ]
+    if resumen:
+        return [resumir_pelicula(pelicula) for pelicula in encontradas]
+    return encontradas
 
 
-def buscar_por_director(catalogo: list[dict], nombre_director: str) -> list[dict]:
+def buscar_por_director(catalogo: list[dict], nombre_director: str, resumen: bool = False) -> list[dict]:
     """Busca peliculas dirigidas por una persona.
 
     Parametros:
         catalogo (list[dict]): lista de peliculas del catalogo.
         nombre_director (str): nombre (o parte del nombre) a buscar en ``directors``.
+        resumen (bool): si es True, devuelve el listado compacto de
+            ``resumir_pelicula`` en vez del objeto completo. Por defecto False.
 
     Retorna:
         list[dict]: peliculas donde algun elemento de ``directors`` contiene
@@ -124,21 +171,26 @@ def buscar_por_director(catalogo: list[dict], nombre_director: str) -> list[dict
     nombre_norm = _normalizar(nombre_director)
     if not nombre_norm:
         return []
-    return [
+    encontradas = [
         pelicula
         for pelicula in catalogo
         if isinstance(pelicula.get("directors"), list)
         and any(nombre_norm in _normalizar(nombre or "") for nombre in pelicula["directors"])
     ]
+    if resumen:
+        return [resumir_pelicula(pelicula) for pelicula in encontradas]
+    return encontradas
 
 
-def buscar_por_genero(catalogo: list[dict], genero: str) -> list[dict]:
+def buscar_por_genero(catalogo: list[dict], genero: str, resumen: bool = False) -> list[dict]:
     """Busca peliculas de un genero.
 
     Parametros:
         catalogo (list[dict]): lista de peliculas del catalogo.
         genero (str): nombre del genero (ej. ``"Comedy"``, ``"Drama"``).
             Acepta coincidencia parcial (``"com"`` puede matchear ``"Comedy"``).
+        resumen (bool): si es True, devuelve el listado compacto de
+            ``resumir_pelicula`` en vez del objeto completo. Por defecto False.
 
     Retorna:
         list[dict]: peliculas donde algun elemento de ``genres`` contiene
@@ -148,21 +200,26 @@ def buscar_por_genero(catalogo: list[dict], genero: str) -> list[dict]:
     genero_norm = _normalizar(genero)
     if not genero_norm:
         return []
-    return [
+    encontradas = [
         pelicula
         for pelicula in catalogo
         if isinstance(pelicula.get("genres"), list)
         and any(genero_norm in _normalizar(nombre or "") for nombre in pelicula["genres"])
     ]
+    if resumen:
+        return [resumir_pelicula(pelicula) for pelicula in encontradas]
+    return encontradas
 
 
-def buscar_por_pais(catalogo: list[dict], pais: str) -> list[dict]:
+def buscar_por_pais(catalogo: list[dict], pais: str, resumen: bool = False) -> list[dict]:
     """Busca peliculas producidas en un pais.
 
     Parametros:
         catalogo (list[dict]): lista de peliculas del catalogo.
         pais (str): nombre del pais productor (ej. ``"Argentina"``).
             Acepta coincidencia parcial.
+        resumen (bool): si es True, devuelve el listado compacto de
+            ``resumir_pelicula`` en vez del objeto completo. Por defecto False.
 
     Retorna:
         list[dict]: peliculas donde algun elemento de ``production_countries``
@@ -172,15 +229,18 @@ def buscar_por_pais(catalogo: list[dict], pais: str) -> list[dict]:
     pais_norm = _normalizar(pais)
     if not pais_norm:
         return []
-    return [
+    encontradas = [
         pelicula
         for pelicula in catalogo
         if isinstance(pelicula.get("production_countries"), list)
         and any(pais_norm in _normalizar(nombre or "") for nombre in pelicula["production_countries"])
     ]
+    if resumen:
+        return [resumir_pelicula(pelicula) for pelicula in encontradas]
+    return encontradas
 
 
-def buscar_por_idioma(catalogo: list[dict], idioma: str) -> list[dict]:
+def buscar_por_idioma(catalogo: list[dict], idioma: str, resumen: bool = False) -> list[dict]:
     """Busca peliculas por idioma original o idiomas hablados.
 
     Parametros:
@@ -189,6 +249,8 @@ def buscar_por_idioma(catalogo: list[dict], idioma: str) -> list[dict]:
             ``original_language`` (ej. ``"en"``). En ``original_language``
             se exige igualdad exacta (ya normalizada); en ``spoken_languages``
             se admite coincidencia parcial.
+        resumen (bool): si es True, devuelve el listado compacto de
+            ``resumir_pelicula`` en vez del objeto completo. Por defecto False.
 
     Retorna:
         list[dict]: peliculas cuyo ``original_language`` coincide o cuyo
@@ -198,7 +260,7 @@ def buscar_por_idioma(catalogo: list[dict], idioma: str) -> list[dict]:
     idioma_norm = _normalizar(idioma)
     if not idioma_norm:
         return []
-    return [
+    encontradas = [
         pelicula
         for pelicula in catalogo
         if _normalizar(pelicula.get("original_language") or "") == idioma_norm
@@ -207,15 +269,20 @@ def buscar_por_idioma(catalogo: list[dict], idioma: str) -> list[dict]:
             and any(idioma_norm in _normalizar(lengua or "") for lengua in pelicula["spoken_languages"])
         )
     ]
+    if resumen:
+        return [resumir_pelicula(pelicula) for pelicula in encontradas]
+    return encontradas
 
 
-def buscar_por_palabra_clave(catalogo: list[dict], palabra_clave: str) -> list[dict]:
+def buscar_por_palabra_clave(catalogo: list[dict], palabra_clave: str, resumen: bool = False) -> list[dict]:
     """Busca peliculas por keyword tematica.
 
     Parametros:
         catalogo (list[dict]): lista de peliculas del catalogo.
         palabra_clave (str): keyword (ej. ``"friendship"``, ``"revenge"``).
             Acepta coincidencia parcial.
+        resumen (bool): si es True, devuelve el listado compacto de
+            ``resumir_pelicula`` en vez del objeto completo. Por defecto False.
 
     Retorna:
         list[dict]: peliculas donde algun elemento de ``keywords`` contiene
@@ -225,15 +292,18 @@ def buscar_por_palabra_clave(catalogo: list[dict], palabra_clave: str) -> list[d
     palabra_norm = _normalizar(palabra_clave)
     if not palabra_norm:
         return []
-    return [
+    encontradas = [
         pelicula
         for pelicula in catalogo
         if isinstance(pelicula.get("keywords"), list)
         and any(palabra_norm in _normalizar(palabra or "") for palabra in pelicula["keywords"])
     ]
+    if resumen:
+        return [resumir_pelicula(pelicula) for pelicula in encontradas]
+    return encontradas
 
 
-def busqueda_combinada(catalogo: list[dict], filtros: dict) -> list[dict]:
+def busqueda_combinada(catalogo: list[dict], filtros: dict, resumen: bool = False) -> list[dict]:
     """Filtra el catalogo aplicando varios criterios a la vez (AND).
 
     Cada clave de ``filtros`` reutiliza una funcion de busqueda de este modulo.
@@ -252,6 +322,9 @@ def busqueda_combinada(catalogo: list[dict], filtros: dict) -> list[dict]:
                 - ``keyword`` (alias: ``palabra_clave``): keyword tematica.
                 - ``anio_desde`` / ``anio_hasta``: inclusive, segun
                   ``release_date``. Aceptan int o str convertible a int.
+        resumen (bool): si es True, devuelve el listado compacto de
+            ``resumir_pelicula`` en vez del objeto completo. Por defecto False.
+            Los filtros siempre se aplican sobre el objeto completo.
 
     Retorna:
         list[dict]: peliculas que cumplen todos los filtros indicados.
@@ -259,6 +332,8 @@ def busqueda_combinada(catalogo: list[dict], filtros: dict) -> list[dict]:
             del catalogo completo.
     """
     if not isinstance(filtros, dict) or not filtros:
+        if resumen:
+            return [resumir_pelicula(pelicula) for pelicula in catalogo]
         return list(catalogo)
     resultado = list(catalogo)
 
@@ -298,4 +373,6 @@ def busqueda_combinada(catalogo: list[dict], filtros: dict) -> list[dict]:
                 filtradas.append(pelicula)
         resultado = filtradas
 
+    if resumen:
+        return [resumir_pelicula(pelicula) for pelicula in resultado]
     return resultado

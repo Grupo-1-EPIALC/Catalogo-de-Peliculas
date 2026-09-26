@@ -41,3 +41,59 @@ Se reviso la PR 5 con `gh pr view` y la API: el diff de codigo estaba sano, pero
 **Si fue modificado o rechazado:** sin modificaciones.
 
 **Cómo se comprobó que funciona:** se volvio a descargar el cuerpo via API y se inspecciono por script: 74 backticks, 0 caracteres de control, 0 `U+FFFD` (los 2 backslashes restantes son el path intencional `.venv\Scripts\activate`). Visualmente verificado con `gh pr view 5`.
+
+## Entrada 4 — 2026-09-25
+
+**Prompt del usuario:**
+> Corregir busqueda.py: la busqueda por titulo debe devolver todo el objeto de la pelicula (id, descripcion, genero, año, etc.); las demas busquedas (actor, director, genero, pais, idioma, palabra clave, combinada) solo un listado. Revisar CLAUDE.md, main.py, crud.py, GUIA_TP.md y manual_usuario.md para contexto.
+
+**Respuesta / propuesta de la IA:**
+Se leyo el contexto nuevo (main.py reescrito con submenus, MANUAL_USUARIO.md, tests/, recomendaciones.py implementado). Hallazgo clave: `recomendaciones.py` consume `buscar_por_genero/_director/_actor/_idioma` y necesita objetos completos (lee `id`, `genres`, `cast`, `vote_average`, etc.), asi que cambiar el retorno rompia otro modulo. Se pregunto al usuario y se acordo: flag opt-in `resumen=False` por defecto + `resumir_pelicula()` que devuelve `{"id", "title", "anio", "genres"}`; `main.py` pide `resumen=True` en todo salvo titulo y muestra ficha detallada vs listado `- Titulo (anio) [id: N]`. Se actualizaron MANUAL_USUARIO.md (seccion 3) y se agregaron 15 tests (8 en test_busqueda.py, 7 en test_main.py).
+
+**Decisión del usuario:** Aceptado
+
+**Si fue modificado o rechazado:** el usuario eligio las opciones recomendadas (flag opt-in y listado id + titulo + anio + generos). Sin cambios al diseño.
+
+**Cómo se comprobó que funciona:** `pytest tests/test_busqueda.py tests/test_main.py`: 64/64 OK (incluye 15 nuevos; los existentes siguen pasando sin tocarlos, prueba de que no hubo rotura). Suite completa: 112 passed, 11 skipped; 7 errores preexistentes en tests de estadisticas/recomendaciones por fixture `catalogo_real` sin decorador (archivos de otros modulos, no tocados). Script temporal contra `data/movies_unified_sample.json` (1000 peliculas): titulo devuelve objetos de 22 claves, actor resumido 6 items de 4 claves, combinada resumida 3 items, y `recomendar_por_ranking` sigue devolviendo objetos completos.
+
+## Entrada 5 — 2026-09-25
+
+**Prompt del usuario:**
+> Nosotros solo debemos tocar busqueda.py, nada mas. Lo mejor es que el catalogo consuma el json completo, creo que mis compañeros estan haciendo eso, no solo el sample. Revisa por las dudas.
+
+**Respuesta / propuesta de la IA:**
+Se verifico que `main.py` carga `data/movies_unified.json` (el catalogo completo, ~67 MB / 45433 peliculas), no el sample: el sample solo se uso para verificaciones rapidas (mismo esquema). Y se recorto la rama `feature/busqueda-formato-resultados` a solo `busqueda.py` (+ este registro): se revertieron los cambios de `main.py`, `MANUAL_USUARIO.md`, `tests/test_busqueda.py` y `tests/test_main.py` a su version de `develop`, ya que son archivos de otros integrantes. Como el flag `resumen` es opt-in con default `False`, el `main.py` actual sigue funcionando igual sin cambios.
+
+**Decisión del usuario:** Aceptado
+
+**Si fue modificado o rechazado:** sin modificaciones.
+
+**Cómo se comprobó que funciona:** script temporal contra el JSON completo (45433 peliculas): titulo "toy story" devuelve objetos completos (Toy Story, Toy Story 2, Toy Story 3, 22 claves), actor "tom hanks" con resumen devuelve 71 listados `{'id': 862, ...}`, y la combinada Comedy + Tom Hanks + 1990-2000 con resumen devuelve 9. `git status` confirma que la rama solo modifica `busqueda.py` y `registro_ia/registro_Elian.md`.
+
+## Entrada 6 — 2026-09-25
+
+**Prompt del usuario:**
+> Por que hubo que crear resumir_pelicula en vez de reutilizar la funcion que ya teniamos? Y: que tests fallaban que tuviste que retirar? Mejor dejarlos con un comentario de que hay que refactorizarlos. Tambien: con que comando ejecuto pruebas manuales de la busqueda?
+
+**Respuesta / propuesta de la IA:**
+Se explico que ninguna funcion existente resumia (todas devolvian el objeto completo) y que el helper evita repetir la proyeccion en 8 funciones + combinada (mismo patron DRY que `_normalizar`/`_anio_estreno`). Se aclaro que ningun test del equipo fallo jamas: los 7 retirados eran tests nuevos propios que probaban helpers de `main.py` revertidos. Se repusieron en `tests/test_main.py` con `@pytest.mark.skip` + comentario de refactor pendiente del cableado de `resumen=True` en `menu_busqueda`. Se indico el comando manual: `python main.py` (app completa) y REPL con `busqueda.py` para el flag `resumen`.
+
+**Decisión del usuario:** Aceptado
+
+**Si fue modificado o rechazado:** sin modificaciones.
+
+**Cómo se comprobó que funciona:** `pytest tests/test_busqueda.py tests/test_main.py`: 57 passed, 7 skipped (los 7 salteados a proposito, suite en verde).
+
+## Entrada 7 — 2026-09-25
+
+**Prompt del usuario:**
+> Creame el jupyter notebook para probar mi motor de busqueda (de uso local, sin subirlo al repo).
+
+**Respuesta / propuesta de la IA:**
+Se creo `prueba_busqueda.ipynb` en la raiz (13 celdas: carga del catalogo completo con fallback al sample, titulo→objeto completo, listados con `resumen=True` por actor/director/genero/pais/idioma/keyword, combinada con tiempos, compatibilidad hacia atras y casos borde). Se ejecuto con `nbclient` en el `.venv` contra las 45433 peliculas y quedo guardado con outputs reales, sin errores. Para que no se versione, se excluyo en `.git/info/exclude` (configuracion local, sin tocar archivos versionados): `git status` no lo muestra y `git check-ignore` lo confirma.
+
+**Decisión del usuario:** Aceptado
+
+**Si fue modificado o rechazado:** sin modificaciones.
+
+**Cómo se comprobó que funciona:** el notebook se ejecuto de punta a punta por script (todas las celdas de codigo con outputs y ningun `error`); ademas se verifico el ignore con `git check-ignore -v`.
