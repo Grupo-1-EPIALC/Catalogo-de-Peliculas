@@ -22,8 +22,19 @@ por categoria, de dos fuentes segun la categoria:
       justifique el filtro de rankings.py), y `rankings.py` no tiene una
       funcion de ranking de idiomas.
 
+Los perfiles de usuario se persisten en un JSON aparte del catalogo de
+peliculas (ver `main.RUTA_PERFILES`), con un "id" numerico ademas del
+nombre: dos usuarios pueden llamarse igual, asi que el nombre solo no
+alcanza para identificar un perfil sin ambiguedad.
+
 Funciones que contiene:
 - crear_perfil_usuario
+- cargar_perfiles
+- guardar_perfiles
+- obtener_perfil_por_id
+- agregar_perfil
+- actualizar_perfil
+- eliminar_perfil
 - filtrar_peliculas_por_gustos
 - calcular_afinidad
 - recomendar_por_ranking
@@ -34,8 +45,10 @@ Funciones auxiliares (uso interno del modulo):
 - _normalizar
 - _preferencia_coincide_con_valor
 - _promedio_por_categoria_combinado
+- _generar_id_usuario
 """
 
+import json
 import random
 import unicodedata
 from typing import Callable
@@ -184,6 +197,133 @@ def crear_perfil_usuario(
         "actores": actores_preferidos,
         "idiomas": idiomas_preferidos,
     }
+
+
+# Parametros:
+#   ruta_json (str): ruta al archivo JSON con los perfiles de usuario persistidos.
+# Retorna:
+#   list[dict]: lista de perfiles cargados desde el archivo. Lista vacia si el
+#       archivo todavia no existe (caso normal la primera vez que se corre la
+#       app, antes de crear ningun perfil).
+# Manejo de errores esperado:
+#   json.JSONDecodeError si el archivo esta mal formado: se informa y se
+#   devuelve una lista vacia en vez de dejar caer el programa.
+def cargar_perfiles(ruta_json: str) -> list[dict]:
+    try:
+        with open(ruta_json, "r", encoding="utf-8") as archivo:
+            datos = json.load(archivo)
+            if not isinstance(datos, list):
+                print(f"Error: El archivo '{ruta_json}' no contiene una lista de perfiles válida.")
+                return []
+            return datos
+    except FileNotFoundError:
+        return []
+    except json.JSONDecodeError as e:
+        print(f"Error: El archivo '{ruta_json}' está mal formado o corrupto ({e}).")
+        return []
+
+
+# Parametros:
+#   perfiles (list[dict]): lista de perfiles de usuario a persistir.
+#   ruta_json (str): ruta destino del archivo JSON.
+# Retorna:
+#   None
+# Manejo de errores esperado:
+#   OSError si no se puede escribir el archivo (permisos, disco, ruta invalida).
+def guardar_perfiles(perfiles: list[dict], ruta_json: str) -> None:
+    try:
+        with open(ruta_json, "w", encoding="utf-8") as archivo:
+            json.dump(perfiles, archivo, ensure_ascii=False, indent=2)
+    except OSError as e:
+        print(f"Error de E/S al intentar guardar en '{ruta_json}': {e}")
+
+
+# Parametros:
+#   perfiles (list[dict]): lista de perfiles de usuario ya persistidos.
+# Retorna:
+#   int: el proximo id disponible (el mayor id existente + 1, o 1 si `perfiles`
+#       esta vacia). El nombre por si solo no alcanza para identificar a un
+#       usuario sin ambiguedad (dos personas pueden llamarse igual); el id es
+#       lo que usan obtener_perfil_por_id/actualizar_perfil/eliminar_perfil.
+def _generar_id_usuario(perfiles: list[dict]) -> int:
+    if not perfiles:
+        return 1
+    return max(perfil["id"] for perfil in perfiles) + 1
+
+
+# Parametros:
+#   perfiles (list[dict]): lista de perfiles de usuario.
+#   id_usuario (int): id del perfil a buscar.
+# Retorna:
+#   dict | None: el perfil encontrado, o None si no existe ese id.
+def obtener_perfil_por_id(perfiles: list[dict], id_usuario: int) -> dict | None:
+    for perfil in perfiles:
+        if perfil.get("id") == id_usuario:
+            return perfil
+    return None
+
+
+# Parametros:
+#   perfiles (list[dict]): lista de perfiles de usuario ya persistidos (se
+#       modifica in-place: se le agrega el perfil nuevo).
+#   nombre/generos_preferidos/directores_preferidos/actores_preferidos/
+#   idiomas_preferidos: ver crear_perfil_usuario.
+# Retorna:
+#   list[dict]: `perfiles` con el nuevo perfil agregado al final (con un "id"
+#       nuevo ya asignado, ver _generar_id_usuario). A diferencia de
+#       crud.crear_pelicula (donde el id de la pelicula ya viene provisto por
+#       el llamador), aca el id lo genera esta funcion: el usuario de la app
+#       no elige su propio id.
+def agregar_perfil(
+    perfiles: list[dict],
+    nombre: str,
+    generos_preferidos: list[str],
+    directores_preferidos: list[str],
+    actores_preferidos: list[str],
+    idiomas_preferidos: list[str],
+) -> list[dict]:
+    nuevo_perfil = crear_perfil_usuario(
+        nombre, generos_preferidos, directores_preferidos, actores_preferidos, idiomas_preferidos
+    )
+    nuevo_perfil["id"] = _generar_id_usuario(perfiles)
+    perfiles.append(nuevo_perfil)
+    return perfiles
+
+
+# Parametros:
+#   perfiles (list[dict]): lista de perfiles de usuario.
+#   id_usuario (int): id del perfil a modificar.
+#   campos_actualizados (dict): pares clave/valor a sobrescribir en el perfil
+#       (ej. {"nombre": "Nuevo nombre"} o {"generos": ["Drama", "Accion"]}).
+# Retorna:
+#   list[dict]: `perfiles` con el perfil modificado.
+# Manejo de errores esperado:
+#   ValueError si no existe un perfil con ese id.
+def actualizar_perfil(perfiles: list[dict], id_usuario: int, campos_actualizados: dict) -> list[dict]:
+    perfil = obtener_perfil_por_id(perfiles, id_usuario)
+    if perfil is None:
+        raise ValueError(f"No existe ningun perfil con el id {id_usuario}.")
+
+    for clave, valor in campos_actualizados.items():
+        perfil[clave] = valor
+
+    return perfiles
+
+
+# Parametros:
+#   perfiles (list[dict]): lista de perfiles de usuario.
+#   id_usuario (int): id del perfil a eliminar.
+# Retorna:
+#   list[dict]: `perfiles` sin el perfil eliminado.
+# Manejo de errores esperado:
+#   ValueError si no existe un perfil con ese id.
+def eliminar_perfil(perfiles: list[dict], id_usuario: int) -> list[dict]:
+    perfil = obtener_perfil_por_id(perfiles, id_usuario)
+    if perfil is None:
+        raise ValueError(f"No existe ningun perfil con el id {id_usuario}.")
+
+    perfiles.remove(perfil)
+    return perfiles
 
 
 # Parametros:
