@@ -16,6 +16,23 @@ usuario anote el ``id`` y vea el detalle despues (ej. ``crud`` opcion 1).
 ``recomendaciones.py`` usa estas funciones con el formato completo (por
 defecto), porque necesita leer varios campos de cada pelicula.
 
+Traduccion de categorias: el catalogo tiene los generos en ingles (ej.
+``"Comedy"``). ``buscar_por_genero`` primero busca el valor tal cual lo
+escribio el usuario; si no encuentra nada, prueba traducirlo de castellano a
+ingles con el diccionario de ``categorias_traducciones.json`` (via
+``traducir_categoria_a_ingles``) y repite la busqueda con el valor en ingles,
+antes de devolver "no encontrado" (lista vacia). Asi ``buscar_por_genero(
+catalogo, "terror")`` encuentra las peliculas de ``"Horror"``.
+
+``traducir_categoria_a_ingles`` es publica (sin guion bajo) a proposito:
+otros modulos que tambien "eligen" una categoria de genero la importan y la
+usan con el mismo criterio (probar la traduccion solo cuando la busqueda
+directa no encuentra nada) en vez de reimplementarla:
+    - ``rankings.top_por_genero``
+    - ``recomendaciones._preferencia_coincide_con_valor`` (usada por
+      ``calcular_afinidad`` y ``recomendar_por_ranking`` para los generos
+      preferidos del perfil de usuario)
+
 Funciones que contiene:
 - resumir_pelicula
 - buscar_por_titulo
@@ -26,9 +43,20 @@ Funciones que contiene:
 - buscar_por_idioma
 - buscar_por_palabra_clave
 - busqueda_combinada
+- traducir_categoria_a_ingles
+
+Funciones auxiliares (uso interno del modulo):
+- _cargar_traducciones_categorias
+- _filtrar_por_genero
 """
 
+import json
 import unicodedata
+from pathlib import Path
+
+# Diccionario ingles -> castellano de categorias (generos), cargado desde
+# categorias_traducciones.json (mismo directorio que este archivo).
+_RUTA_TRADUCCIONES_CATEGORIAS = Path(__file__).resolve().parent / "categorias_traducciones.json"
 
 
 def _normalizar(texto: str) -> str:
@@ -47,6 +75,61 @@ def _normalizar(texto: str) -> str:
     """
     descompuesto = unicodedata.normalize("NFD", str(texto).strip().casefold())
     return "".join(letra for letra in descompuesto if unicodedata.category(letra) != "Mn")
+
+
+def _cargar_traducciones_categorias() -> dict[str, str]:
+    """Carga el diccionario ingles -> castellano de categorias desde
+    ``categorias_traducciones.json``.
+
+    Si el archivo no existe o esta mal formado, devuelve ``{}`` en vez de
+    romper: la traduccion es una ayuda extra, no una dependencia critica de
+    la busqueda (sin ella, ``buscar_por_genero`` sigue funcionando como
+    antes, solo que sin el intento de traduccion).
+
+    Retorna:
+        dict[str, str]: ``{categoria_en_ingles: categoria_en_castellano}``.
+    """
+    try:
+        with open(_RUTA_TRADUCCIONES_CATEGORIAS, encoding="utf-8") as archivo:
+            datos = json.load(archivo)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return datos if isinstance(datos, dict) else {}
+
+
+# Diccionario ingles -> castellano, tal como esta en el JSON.
+CATEGORIAS_EN_A_ES: dict[str, str] = _cargar_traducciones_categorias()
+
+# Diccionario castellano (normalizado) -> ingles, derivado del anterior.
+# Se normaliza la clave castellana (sin mayusculas ni tildes) para que la
+# busqueda de la traduccion sea igual de tolerante que el resto del modulo
+# (ej. "terror", "Terror" o "TERROR" deben encontrar lo mismo).
+CATEGORIAS_ES_A_EN: dict[str, str] = {
+    _normalizar(categoria_es): categoria_en
+    for categoria_en, categoria_es in CATEGORIAS_EN_A_ES.items()
+}
+
+
+def traducir_categoria_a_ingles(categoria: str) -> str | None:
+    """Traduce una categoria de castellano a ingles usando
+    ``categorias_traducciones.json``.
+
+    Funcion publica: ademas de usarla ``buscar_por_genero`` en este modulo,
+    la importan otros modulos que tambien comparan/filtran por genero
+    (``rankings.py``, ``recomendaciones.py``), para que el criterio de
+    traduccion sea el mismo en todos lados (ver el docstring del modulo).
+
+    Parametros:
+        categoria (str): nombre de categoria, presumiblemente en castellano
+            (ej. ``"terror"``, ``"Ciencia ficcion"``). La comparacion ignora
+            mayusculas, tildes y espacios en las puntas.
+
+    Retorna:
+        str | None: el nombre en ingles tal como aparece en el catalogo
+            (ej. ``"Horror"``), o ``None`` si ``categoria`` no coincide con
+            ninguna traduccion conocida.
+    """
+    return CATEGORIAS_ES_A_EN.get(_normalizar(categoria))
 
 
 def _anio_estreno(pelicula: dict) -> int | None:
@@ -182,30 +265,53 @@ def buscar_por_director(catalogo: list[dict], nombre_director: str, resumen: boo
     return encontradas
 
 
-def buscar_por_genero(catalogo: list[dict], genero: str, resumen: bool = False) -> list[dict]:
-    """Busca peliculas de un genero.
-
-    Parametros:
-        catalogo (list[dict]): lista de peliculas del catalogo.
-        genero (str): nombre del genero (ej. ``"Comedy"``, ``"Drama"``).
-            Acepta coincidencia parcial (``"com"`` puede matchear ``"Comedy"``).
-        resumen (bool): si es True, devuelve el listado compacto de
-            ``resumir_pelicula`` en vez del objeto completo. Por defecto False.
-
-    Retorna:
-        list[dict]: peliculas donde algun elemento de ``genres`` contiene
-            ``genero``. Se omiten las que no tienen ``genres`` como lista.
-            Lista vacia si ``genero`` queda vacio al normalizar.
-    """
-    genero_norm = _normalizar(genero)
-    if not genero_norm:
-        return []
-    encontradas = [
+def _filtrar_por_genero(catalogo: list[dict], genero_norm: str) -> list[dict]:
+    """Filtra ``catalogo`` por un genero ya normalizado (helper interno de
+    ``buscar_por_genero``, para no repetir el filtro en el intento original
+    y en el reintento con el genero traducido)."""
+    return [
         pelicula
         for pelicula in catalogo
         if isinstance(pelicula.get("genres"), list)
         and any(genero_norm in _normalizar(nombre or "") for nombre in pelicula["genres"])
     ]
+
+
+def buscar_por_genero(catalogo: list[dict], genero: str, resumen: bool = False) -> list[dict]:
+    """Busca peliculas de un genero.
+
+    El catalogo tiene los generos en ingles. Si ``genero`` no encuentra
+    nada tal como se escribio, se intenta traducirlo de castellano a ingles
+    (``categorias_traducciones.json``, via ``traducir_categoria_a_ingles``)
+    y se repite la busqueda con el valor en ingles antes de devolver "no
+    encontrado". Ej.: ``buscar_por_genero(catalogo, "terror")`` encuentra
+    las peliculas de ``"Horror"``.
+
+    Parametros:
+        catalogo (list[dict]): lista de peliculas del catalogo.
+        genero (str): nombre del genero, en ingles o castellano (ej.
+            ``"Comedy"`` o ``"comedia"``). Acepta coincidencia parcial
+            (``"com"`` puede matchear ``"Comedy"``).
+        resumen (bool): si es True, devuelve el listado compacto de
+            ``resumir_pelicula`` en vez del objeto completo. Por defecto False.
+
+    Retorna:
+        list[dict]: peliculas donde algun elemento de ``genres`` contiene
+            ``genero`` (o su traduccion al ingles). Se omiten las que no
+            tienen ``genres`` como lista. Lista vacia si ``genero`` queda
+            vacio al normalizar, o si no hay coincidencias ni traduccion.
+    """
+    genero_norm = _normalizar(genero)
+    if not genero_norm:
+        return []
+
+    encontradas = _filtrar_por_genero(catalogo, genero_norm)
+
+    if not encontradas:
+        genero_en_ingles = traducir_categoria_a_ingles(genero)
+        if genero_en_ingles is not None:
+            encontradas = _filtrar_por_genero(catalogo, _normalizar(genero_en_ingles))
+
     if resumen:
         return [resumir_pelicula(pelicula) for pelicula in encontradas]
     return encontradas

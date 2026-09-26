@@ -15,10 +15,17 @@ Funciones que contiene:
 - ranking_generos
 - ranking_actores
 - ranking_directores
+
+``top_por_genero`` acepta el genero en castellano o ingles: si no encuentra
+nada con el valor tal cual, prueba traducirlo con
+``busqueda.traducir_categoria_a_ingles`` (mismo criterio que
+``busqueda.buscar_por_genero``, ver el docstring de ese modulo).
 """
 
 import math
 import unicodedata
+
+import busqueda
 
 
 def _valor_numerico(pelicula: dict, campo: str) -> float | None:
@@ -133,13 +140,22 @@ def top_peliculas(catalogo: list[dict], campo_puntuacion: str, cantidad: int) ->
 
 # Parametros:
 #   catalogo (list[dict]): lista de peliculas del catalogo.
-#   genero (str): genero a filtrar (ej. "Animation").
+#   genero (str): genero a filtrar, en ingles o castellano (ej. "Animation"
+#       o "animacion").
 #   campo_puntuacion (str): campo numerico a usar para ordenar.
 #   cantidad (int): cantidad maxima de peliculas a devolver.
 # Retorna:
-#   list[dict]: las `cantidad` peliculas de ese genero con mayor puntuacion.
+#   list[dict]: las `cantidad` peliculas de ese genero (o su traduccion al
+#       ingles, si el valor tal cual no encuentra nada) con mayor puntuacion.
 def top_por_genero(catalogo: list[dict], genero: str, campo_puntuacion: str, cantidad: int) -> list[dict]:
-    return _top_por_categoria(catalogo, "genres", genero, campo_puntuacion, cantidad)
+    resultado = _top_por_categoria(catalogo, "genres", genero, campo_puntuacion, cantidad)
+
+    if not resultado:
+        genero_en_ingles = busqueda.traducir_categoria_a_ingles(genero)
+        if genero_en_ingles is not None:
+            resultado = _top_por_categoria(catalogo, "genres", genero_en_ingles, campo_puntuacion, cantidad)
+
+    return resultado
 
 
 # Parametros:

@@ -560,3 +560,101 @@ el usuario todavia no lo reviso).
 usuario habia mergeado ahi las ramas anteriores). El usuario recordo
 explicitamente aplicar el guardrail de `CLAUDE.md`; se creo la rama
 `feature/integracion-rankings-y-busqueda-resumen` antes de seguir.
+
+---
+
+### Entrada 12 — 2026-09-25
+
+**Prompt del usuario:**
+> crea un diccionario en json y una funcion auxiliar ddentro de busqueda
+> para traducir las categorias del ingles al castellano como un auxiliar
+> para las funciones donde se usen categorias, Debe siempre rimero buscar
+> el imput en la lista de categorias del objeto, si no lo encuentra busca
+> si hay una traduccion del castellando al ingles y toma el valor en ingles
+> para repetir la busqueda antes de de dar la respuesta de no encontrado.
+>
+> (seguido, en el mismo hilo) integralo en todos los lugares donde se elija
+> una categoria, aunque la funcion vive en busqueda
+
+**Contexto de arranque:** al empezar esta tarea aparecieron notas del
+sistema indicando que `main.py`, `recomendaciones.py` y
+`tests/test_recomendaciones.py` habian "vuelto" a una version anterior. Se
+investigo con `git reflog`/`git log` antes de tocar nada: no se habia
+perdido trabajo — el usuario habia commiteado la Entrada 11 (`80dcf28`) y
+armado una rama nueva `traduccion-de-catagorias` a partir de un punto de
+`develop` anterior a ese commit. El usuario pidio "traete los cambios de
+develop a esta rama antes de avanzar"; se hizo `git fetch` + `git merge
+origin/develop` (fast-forward limpio, sin commits propios divergentes) y se
+sincronizo tambien el `develop` local.
+
+**Respuesta / propuesta de la IA:**
+1. Se creo `categorias_traducciones.json` (raiz del repo, no en `data/` que
+   esta gitignoreada) con las traducciones ingles -> castellano de los 20
+   generos reales del dataset (verificados contra
+   `data/movies_unified.json`, no inventados).
+2. En `busqueda.py`: se agrego `_cargar_traducciones_categorias` (carga el
+   JSON, devuelve `{}` si falta o esta mal formado, para que la traduccion
+   sea una ayuda extra y no una dependencia critica) y
+   `traducir_categoria_a_ingles` (publica, sin guion bajo, a proposito).
+   `buscar_por_genero` ahora: busca el valor tal cual primero; si no hay
+   coincidencias, traduce de castellano a ingles y reintenta; si tampoco
+   hay traduccion, devuelve `[]`. Se extrajo `_filtrar_por_genero` para no
+   duplicar el filtro entre el intento original y el reintento.
+   `busqueda_combinada` hereda esto automaticamente (llama a
+   `buscar_por_genero` para el filtro "genero").
+3. El usuario aclaro que la funcion debia usarse "en todos los lugares
+   donde se elija una categoria, aunque la funcion viva en busqueda" —
+   se identificaron y ajustaron dos puntos mas:
+   - `rankings.top_por_genero`: mismo patron (intentar directo, despues
+     traducido) importando `busqueda.traducir_categoria_a_ingles`.
+   - `recomendaciones._preferencia_coincide_con_valor` (el helper
+     compartido por `calcular_afinidad` y el promedio historico dentro de
+     `recomendar_por_ranking`): si la comparacion directa normalizada no
+     matchea, prueba tambien la traduccion de la preferencia. Como el
+     diccionario es solo de generos, para preferencias de actor/director/
+     idioma la traduccion simplemente no encuentra nada (no hace falta que
+     la funcion "sepa" que categoria esta comparando).
+   No hizo falta tocar `main.py` ni `estadisticas.py`: `main.py` solo pasa
+   el texto que escribe el usuario a estas funciones, y
+   `estadisticas.promedio_por_genero` no recibe un genero como filtro (
+   agrupa todos).
+4. Se corrigieron ademas dos secciones desactualizadas de
+   `MANUAL_USUARIO.md` (detectadas al verificar los ejemplos contra
+   comportamiento real, no porque se pidieran explicitamente): la
+   afirmacion de que buscar genero en castellano "no encontraria nada" (ya
+   no es cierto) y la seccion de Rankings, que todavia decia "pendiente de
+   implementacion" (ya esta implementado desde la Entrada 11).
+
+**Decision del usuario:** Pendiente de confirmacion (cambios recien
+aplicados).
+
+**Como se comprobo que funciona:**
+1. Contra el dataset real: `buscar_por_genero(catalogo, "terror")` devuelve
+   exactamente los mismos 4.671 ids que `buscar_por_genero(catalogo,
+   "Horror")`; mismo patron verificado para "Ciencia Ficción"/"Science
+   Fiction" (3.044) y una categoria inexistente en ambos idiomas devuelve
+   `[]`.
+2. Se agregaron 8 tests nuevos en `test_busqueda.py`
+   (`TestTraduccionDeCategorias` + `TestTraduccionDeCategoriasFuncional`,
+   esta ultima parametrizada contra el dataset real con 5 pares
+   castellano/ingles).
+3. Integracion en `rankings.py`: verificado a mano que
+   `top_por_genero(catalogo, "comedia", ...)` devuelve lo mismo que con
+   `"Comedy"`, mas 2 tests nuevos en `test_rankings.py`.
+4. Integracion en `recomendaciones.py`: verificado a mano que un perfil con
+   genero preferido `"terror"` da los mismos resultados
+   (`recomendar_por_ranking`) que uno con `"Horror"`, y que
+   `calcular_afinidad` pasa de 0 a >=1 para una pelicula de Horror con ese
+   perfil. Se agregaron 2 tests nuevos en `test_recomendaciones.py`,
+   incluyendo uno que confirma que la traduccion no genera falsos positivos
+   en categorias que no son genero (una preferencia de actor "terror" no
+   matchea por casualidad con nombres de actores).
+5. Al verificar a mano el ejemplo de "buscar por actor" para el manual, se
+   encontro que el campo `title` de la pelicula id 862 en el dataset local
+   dice literalmente `"Toy - Story"` (con guion) en vez de `"Toy Story"`,
+   mientras que `original_title` sigue correcto. No es un bug de esta
+   sesion: es un dato local (no versionado) casi seguro modificado por el
+   usuario probando la opcion "Editar un campo" del CRUD. No se toco el
+   archivo; se ajusto el ejemplo del manual para no depender de esa fila.
+6. Suite completa del repo: **151 passed** (sin skips — ya no queda ningun
+   modulo sin implementar).
