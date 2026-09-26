@@ -68,12 +68,13 @@ MENU_BUSQUEDA: dict[int, str] = {
 
 # crud.py
 MENU_CRUD: dict[int, str] = {
-    1: "Ver pelicula por id",
-    2: "Agregar pelicula",
-    3: "Editar un campo de una pelicula",
-    4: "Eliminar pelicula",
-    5: "Agregar valor a una lista (genero, actor, etc.)",
-    6: "Quitar valor de una lista (genero, actor, etc.)",
+    1: "Buscar id por titulo",
+    2: "Ver pelicula por id",
+    3: "Agregar pelicula",
+    4: "Editar un campo de una pelicula",
+    5: "Eliminar pelicula",
+    6: "Agregar valor a una lista (genero, actor, etc.)",
+    7: "Quitar valor de una lista (genero, actor, etc.)",
     0: "Volver al menu principal",
 }
 
@@ -300,9 +301,7 @@ def menu_busqueda(catalogo: list[dict]) -> None:
 # Parametros:
 #   catalogo (list[dict]): catalogo de peliculas ya cargado en memoria.
 # Retorna:
-#   list[dict]: el catalogo, actualizado si el usuario creo/edito/elimino
-#       alguna pelicula (crud.py). Cada cambio se persiste de inmediato con
-#       crud.guardar_catalogo.
+#   list[dict]: el catalogo actualizado tras aplicar las operaciones del CRUD.
 def menu_crud(catalogo: list[dict]) -> list[dict]:
     while True:
         print("\n--- CRUD de peliculas ---")
@@ -311,49 +310,68 @@ def menu_crud(catalogo: list[dict]) -> list[dict]:
 
         if opcion == 0:
             return catalogo
+
         if opcion == 1:
+            titulo = input("Titulo de la pelicula a buscar: ")
+            # MODIFICACION: Nueva opcion 1 que consulta la ID usando el modulo crud
+            _mostrar_resultado(crud.obtener_id_por_titulo(titulo))
+            continue
+        
+        if opcion == 2:
             id_pelicula = _pedir_entero("Id de la pelicula: ")
-            _mostrar_resultado(crud.obtener_pelicula_por_id(catalogo, id_pelicula))
+            # MODIFICACION: Se elimina el parametro 'catalogo', crud.py consulta directo la fuente
+            _mostrar_resultado(crud.obtener_pelicula_por_id(id_pelicula))
             continue
 
-        # Las operaciones que modifican el catalogo (2 a 6) pueden fallar por
-        # motivos esperables del usuario (id duplicado, id inexistente, campo
-        # de lista invalido, valor no presente): crud.py las señala con
-        # ValueError. Sin este try/except, cualquiera de esos casos tumbaba
-        # toda la aplicacion.
         try:
-            if opcion == 2:
+            if opcion == 3:
                 nueva_pelicula = {
                     "id": _pedir_entero("Id de la nueva pelicula: "),
                     "title": input("Titulo: "),
                 }
-                catalogo = crud.crear_pelicula(catalogo, nueva_pelicula)
-            elif opcion == 3:
+                # MODIFICACION: Se elimina 'catalogo' como primer parametro. 
+                # crud.crear_pelicula se encarga de guardar en disco y devuelve el catalogo actualizado.
+                catalogo = crud.crear_pelicula(nueva_pelicula)
+
+            elif opcion == 4:
                 id_pelicula = _pedir_entero("Id de la pelicula a editar: ")
                 campo = input("Campo a modificar (ej. title, vote_average, tagline): ")
                 valor = input("Nuevo valor: ")
-                catalogo = crud.actualizar_pelicula(catalogo, id_pelicula, {campo: valor})
-            elif opcion == 4:
-                id_pelicula = _pedir_entero("Id de la pelicula a eliminar: ")
-                catalogo = crud.eliminar_pelicula(catalogo, id_pelicula)
+                # MODIFICACION: Se remueve el parametro 'catalogo'.
+                catalogo = crud.actualizar_pelicula(id_pelicula, {campo: valor})
+
             elif opcion == 5:
-                id_pelicula = _pedir_entero("Id de la pelicula: ")
-                campo_lista = input("Campo tipo lista (genres, cast, directors, keywords, production_companies, production_countries, spoken_languages): ")
-                valor = input("Valor a agregar: ")
-                catalogo = crud.agregar_valor_a_lista(catalogo, id_pelicula, campo_lista, valor)
+                id_pelicula = _pedir_entero("Id de la pelicula a eliminar: ")
+                # MODIFICACION: Se remueve el parametro 'catalogo'.
+                catalogo = crud.eliminar_pelicula(id_pelicula)
+
             elif opcion == 6:
                 id_pelicula = _pedir_entero("Id de la pelicula: ")
                 campo_lista = input("Campo tipo lista (genres, cast, directors, keywords, production_companies, production_countries, spoken_languages): ")
+                valor = input("Valor a agregar: ")
+                # MODIFICACION: Se remueve el parametro 'catalogo'.
+                catalogo = crud.agregar_valor_a_lista(id_pelicula, campo_lista, valor)
+
+            elif opcion == 7:
+                id_pelicula = _pedir_entero("Id de la pelicula: ")
+                campo_lista = input("Campo tipo lista (genres, cast, directors, keywords, production_companies, production_countries, spoken_languages): ")
                 valor = input("Valor a quitar: ")
-                catalogo = crud.quitar_valor_de_lista(catalogo, id_pelicula, campo_lista, valor)
+                # MODIFICACION: Se remueve el parametro 'catalogo'.
+                catalogo = crud.quitar_valor_de_lista(id_pelicula, campo_lista, valor)
+
             else:
                 print("Opcion invalida.")
                 continue
+
+            print("Operacion realizada y guardada exitosamente.")
+
         except ValueError as error:
             print(f"No se pudo completar la operacion: {error}")
             continue
 
-        crud.guardar_catalogo(catalogo, RUTA_DATOS)
+        # MODIFICACION: Se elimino la llamada manual 'crud.guardar_catalogo(catalogo, RUTA_DATOS)' 
+        # que estaba aqui al final, ya que el modulo crud.py autosuficiente guarda en disco 
+        # e integra la persistencia dentro de cada operacion.
 
 
 # Parametros:
@@ -620,7 +638,9 @@ def main() -> None:
         opcion = _pedir_entero("Opcion: ")
 
         if opcion == 0:
-            crud.guardar_catalogo(catalogo, RUTA_DATOS)
+            # MODIFICACION: Se quito 'crud.guardar_catalogo(catalogo, RUTA_DATOS)' de aqui
+            # porque los datos se guardan en tiempo real tras cada operacion en crud.py.
+            # Los demas modulos solo leen, no modifican el catalogo, asi que no necesitan persistir nada.
             print("Hasta la proxima.")
             break
         elif opcion == 1:
