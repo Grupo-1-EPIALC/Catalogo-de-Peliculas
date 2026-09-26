@@ -213,12 +213,6 @@ class TestMenuCrudFuncional:
         assert any(p["id"] == 2 and p["title"] == "Pelicula Nueva" for p in resultado)
 
 
-# NOTA (Elian, PR #10): estos tests quedaron salteados a proposito. Cubren el
-# display de ficha-detallada vs. listado que main.py todavia no implementa
-# (menu_busqueda aun no pasa resumen=True ni tiene los helpers de mostrado).
-# Cuando se cablee main.py, hay que refactorizarlos contra los nombres
-# finales de esos helpers y quitar el skip.
-@pytest.mark.skip(reason="requiere el cableado de resumen=True en menu_busqueda (PR #10 solo toca busqueda.py)")
 class TestMostrarListadoYDetallePeliculas:
     """Helpers futuros del submenu de busqueda: el listado compacto (con id)
     y la ficha detallada de la busqueda por titulo."""
@@ -252,7 +246,6 @@ class TestMostrarListadoYDetallePeliculas:
         assert "sin resultado" in capsys.readouterr().out
 
 
-@pytest.mark.skip(reason="requiere el cableado de resumen=True en menu_busqueda (PR #10 solo toca busqueda.py)")
 class TestMenuBusquedaFuncional:
     """menu_busqueda end-to-end contra busqueda.py real: la opcion 1 (titulo)
     muestra la ficha detallada y la opcion 2 (actor) el listado con id."""

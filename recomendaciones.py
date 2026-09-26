@@ -5,13 +5,22 @@ Funciones para armar un perfil de gustos de un usuario (generos, directores,
 actores e idiomas preferidos) y generar recomendaciones de peliculas del
 catalogo en base a ese perfil, de dos formas distintas:
     1. Por ranking: coincidencias ordenadas por un puntaje compuesto que
-       combina el puntaje propio de la pelicula, el promedio historico
-       (estadisticas.py) de sus categorias preferidas, y la afinidad.
+       combina el puntaje propio de la pelicula, el promedio historico de
+       sus categorias preferidas, y la afinidad.
     2. Al azar: coincidencias elegidas aleatoriamente.
 
 Depende de `busqueda.py` (para filtrar por gustos, reutilizando
-buscar_por_genero/_director/_actor/_idioma) y de `estadisticas.py` (para el
-promedio historico por categoria).
+buscar_por_genero/_director/_actor/_idioma) y, para el promedio historico
+por categoria, de dos fuentes segun la categoria:
+    - actores y directores: primero `rankings.py` (ranking_actores /
+      ranking_directores), que exige un minimo de peliculas por persona y
+      da un promedio mas representativo; si una persona no llega a ese
+      minimo, se usa como respaldo el promedio "crudo" de `estadisticas.py`
+      (promedio_por_actor / promedio_por_director).
+    - generos e idiomas: directamente `estadisticas.py`. Los generos son un
+      puñado de categorias fijas (no hay problema de dispersion que
+      justifique el filtro de rankings.py), y `rankings.py` no tiene una
+      funcion de ranking de idiomas.
 
 Funciones que contiene:
 - crear_perfil_usuario
@@ -24,6 +33,7 @@ Funciones auxiliares (uso interno del modulo):
 - _valor_numerico
 - _normalizar
 - _preferencia_coincide_con_valor
+- _promedio_por_categoria_combinado
 """
 
 import random
@@ -32,6 +42,7 @@ from typing import Callable
 
 import busqueda
 import estadisticas
+import rankings
 
 # Cuanto suma cada preferencia coincidente (genero/director/actor/idioma) al
 # puntaje compuesto de recomendar_por_ranking. El puntaje propio de la
@@ -40,10 +51,17 @@ import estadisticas
 # un conteo (0..N) y necesita este peso para no quedar fuera de escala.
 PESO_AFINIDAD = 0.5
 
+# Cantidad minima de peliculas que debe tener un actor/director en el
+# catalogo para que rankings.py lo incluya en su ranking (fuente primaria
+# del promedio historico de esas dos categorias). Por debajo de este minimo,
+# se cae al promedio "crudo" sin piso de estadisticas.py (fuente secundaria).
+MINIMO_PELICULAS_RANKING = 2
+
 # Mapea cada preferencia del perfil de usuario con:
 #   - el campo correspondiente en el dict de una pelicula,
 #   - la funcion de busqueda.py que filtra el catalogo por esa preferencia,
-#   - la funcion de estadisticas.py que da el promedio historico por esa categoria.
+#   - la funcion de estadisticas.py que da el promedio historico "crudo" por
+#     esa categoria (fuente secundaria/unica, ver _promedio_por_categoria_combinado).
 # Se usa en filtrar_peliculas_por_gustos, calcular_afinidad y
 # recomendar_por_ranking para no repetir la misma logica 4 veces (una por
 # genero/director/actor/idioma).
@@ -52,6 +70,15 @@ CAMPOS_PREFERENCIA: dict[str, tuple[str, Callable, Callable]] = {
     "directores": ("directors", busqueda.buscar_por_director, estadisticas.promedio_por_director),
     "actores": ("cast", busqueda.buscar_por_actor, estadisticas.promedio_por_actor),
     "idiomas": ("spoken_languages", busqueda.buscar_por_idioma, estadisticas.promedio_por_idioma),
+}
+
+# Para actores y directores, la funcion de rankings.py que da el promedio
+# "primario" (mas representativo, con piso minimo de peliculas). Generos e
+# idiomas no estan aca: quedan solo con la fuente de CAMPOS_PREFERENCIA
+# (ver el docstring del modulo, arriba, para el motivo).
+FUNCIONES_RANKING_POR_CATEGORIA: dict[str, Callable] = {
+    "directores": rankings.ranking_directores,
+    "actores": rankings.ranking_actores,
 }
 
 
@@ -97,6 +124,30 @@ def _preferencia_coincide_con_valor(preferencia: str, valor_pelicula: str) -> bo
     if not preferencia_norm:
         return False
     return preferencia_norm in _normalizar(valor_pelicula)
+
+
+# Parametros:
+#   catalogo (list[dict]): lista de peliculas del catalogo.
+#   clave_perfil (str): "generos", "directores", "actores" o "idiomas".
+#   campo_puntuacion (str): campo numerico a promediar (ej. "vote_average").
+# Retorna:
+#   dict[str, float]: promedio historico por categoria. Para "directores" y
+#       "actores", combina dos fuentes: rankings.py como primaria (mas
+#       representativa, exige MINIMO_PELICULAS_RANKING peliculas por
+#       persona) y estadisticas.py como secundaria/respaldo, usada solo
+#       para las personas que rankings.py dejo afuera por no llegar al
+#       minimo. Para "generos" e "idiomas" se devuelve directamente el
+#       promedio "crudo" de estadisticas.py (unica fuente disponible/util).
+def _promedio_por_categoria_combinado(catalogo: list[dict], clave_perfil: str, campo_puntuacion: str) -> dict[str, float]:
+    _, _, funcion_promedio_estadisticas = CAMPOS_PREFERENCIA[clave_perfil]
+    promedio_secundario = funcion_promedio_estadisticas(catalogo, campo_puntuacion)
+
+    funcion_ranking = FUNCIONES_RANKING_POR_CATEGORIA.get(clave_perfil)
+    if funcion_ranking is None:
+        return promedio_secundario
+
+    promedio_primario = dict(funcion_ranking(catalogo, campo_puntuacion, MINIMO_PELICULAS_RANKING))
+    return {**promedio_secundario, **promedio_primario}
 
 
 # Parametros:
@@ -176,7 +227,10 @@ def calcular_afinidad(pelicula: dict, perfil_usuario: dict) -> int:
 #       mayor a menor segun un puntaje compuesto:
 #         (puntaje propio de la pelicula + promedio historico de sus
 #          categorias preferidas coincidentes) / 2, mas PESO_AFINIDAD por
-#         cada coincidencia de genero/director/actor/idioma.
+#         cada coincidencia de genero/director/actor/idioma. El promedio
+#         historico de actor/director sale de rankings.py cuando esa
+#         persona tiene suficientes peliculas, o de estadisticas.py si no
+#         (ver _promedio_por_categoria_combinado).
 #       Si una pelicula no tiene categorias coincidentes con promedio
 #       historico disponible, se usa solo su puntaje propio.
 def recomendar_por_ranking(catalogo: list[dict], perfil_usuario: dict, campo_puntuacion: str, cantidad: int) -> list[dict]:
@@ -187,8 +241,8 @@ def recomendar_por_ranking(catalogo: list[dict], perfil_usuario: dict, campo_pun
     # se calcula una sola vez por categoria (no por pelicula): recorrer todo
     # el catalogo dentro del ordenamiento seria muy costoso con miles de peliculas
     promedios_por_categoria = {
-        clave_perfil: funcion_promedio(catalogo, campo_puntuacion)
-        for clave_perfil, (_, _, funcion_promedio) in CAMPOS_PREFERENCIA.items()
+        clave_perfil: _promedio_por_categoria_combinado(catalogo, clave_perfil, campo_puntuacion)
+        for clave_perfil in CAMPOS_PREFERENCIA
     }
 
     def _puntaje_compuesto(pelicula: dict) -> float:
