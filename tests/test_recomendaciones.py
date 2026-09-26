@@ -19,6 +19,7 @@ import pytest
 
 import busqueda
 import estadisticas
+import rankings
 import recomendaciones
 
 RUTA_DATASET_REAL = Path(__file__).resolve().parent.parent / "data" / "movies_unified.json"
@@ -85,6 +86,53 @@ def perfil() -> dict:
         actores_preferidos=["ActorX"],
         idiomas_preferidos=["English"],
     )
+
+
+class TestPromedioPorCategoriaCombinado:
+    """_promedio_por_categoria_combinado combina dos fuentes para actores y
+    directores: rankings.py como primaria (mas representativa, con piso
+    minimo de peliculas) y estadisticas.py como respaldo. Se monkeypatchea
+    `FUNCIONES_RANKING_POR_CATEGORIA` (no `rankings.ranking_actores`
+    directamente) porque ese dict ya guarda la referencia a la funcion real
+    al importar el modulo; parchear el atributo del modulo `rankings`
+    despues no afectaria una referencia ya capturada."""
+
+    def test_usa_rankings_como_fuente_primaria_cuando_esta_disponible(self, monkeypatch):
+        monkeypatch.setitem(
+            recomendaciones.FUNCIONES_RANKING_POR_CATEGORIA,
+            "actores",
+            lambda catalogo, campo, minimo: [("ActorA", 99.0)],
+        )
+        catalogo = [{"id": 1, "cast": ["ActorA"], "vote_average": 5.0}]
+
+        resultado = recomendaciones._promedio_por_categoria_combinado(catalogo, "actores", "vote_average")
+
+        # gana el valor "primario" simulado (99.0), no el crudo de estadisticas.py (5.0)
+        assert resultado["ActorA"] == 99.0
+
+    def test_cae_al_promedio_crudo_si_rankings_lo_deja_afuera(self, monkeypatch):
+        monkeypatch.setitem(
+            recomendaciones.FUNCIONES_RANKING_POR_CATEGORIA,
+            "actores",
+            lambda catalogo, campo, minimo: [],  # nadie llega al minimo de peliculas
+        )
+        catalogo = [{"id": 1, "cast": ["ActorB"], "vote_average": 5.0}]
+
+        resultado = recomendaciones._promedio_por_categoria_combinado(catalogo, "actores", "vote_average")
+
+        # como rankings.py no lo incluyo, usa el promedio crudo de estadisticas.py
+        assert resultado["ActorB"] == 5.0
+
+    def test_generos_e_idiomas_no_usan_rankings_py(self):
+        # rankings.py no tiene ranking de idiomas, y para generos no hay
+        # ganancia (pocas categorias); FUNCIONES_RANKING_POR_CATEGORIA
+        # deliberadamente no las incluye.
+        assert "generos" not in recomendaciones.FUNCIONES_RANKING_POR_CATEGORIA
+        assert "idiomas" not in recomendaciones.FUNCIONES_RANKING_POR_CATEGORIA
+
+        catalogo = [{"id": 1, "genres": ["Drama"], "vote_average": 7.0}]
+        resultado = recomendaciones._promedio_por_categoria_combinado(catalogo, "generos", "vote_average")
+        assert resultado == {"Drama": 7.0}
 
 
 class TestCrearPerfilUsuario:
@@ -234,3 +282,26 @@ class TestFuncionalConBusquedaYDatasetReales:
         top = recomendaciones.recomendar_por_ranking(catalogo_real, perfil, "vote_average", 5)
         assert len(top) == 5
         assert all(recomendaciones.calcular_afinidad(p, perfil) >= 1 for p in top)
+
+    def test_actor_con_pocas_peliculas_usa_estadisticas_como_respaldo(self, catalogo_real):
+        # un actor con 1 sola pelicula no llega al minimo de rankings.py, asi
+        # que _promedio_por_categoria_combinado debe caer al promedio crudo
+        # de estadisticas.py (y no quedar afuera del diccionario combinado)
+        promedio_crudo = estadisticas.promedio_por_actor(catalogo_real, "vote_average")
+        ranking_actores = dict(
+            rankings.ranking_actores(catalogo_real, "vote_average", recomendaciones.MINIMO_PELICULAS_RANKING)
+        )
+
+        solo_en_estadisticas = next(actor for actor in promedio_crudo if actor not in ranking_actores)
+
+        combinado = recomendaciones._promedio_por_categoria_combinado(catalogo_real, "actores", "vote_average")
+
+        assert combinado[solo_en_estadisticas] == promedio_crudo[solo_en_estadisticas]
+
+    def test_actor_con_varias_peliculas_usa_rankings_como_primaria(self, catalogo_real):
+        combinado = recomendaciones._promedio_por_categoria_combinado(catalogo_real, "actores", "vote_average")
+        primario = dict(
+            rankings.ranking_actores(catalogo_real, "vote_average", recomendaciones.MINIMO_PELICULAS_RANKING)
+        )
+
+        assert combinado["Tom Hanks"] == primario["Tom Hanks"]

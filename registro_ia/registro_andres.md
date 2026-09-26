@@ -479,3 +479,84 @@ darlos por buenos:
 4. Los numeros del resumen estadistico de ejemplo (`total_peliculas: 45433`,
    `promedio_vote_average: 5.62`, etc.) son los mismos ya verificados en la
    Entrada 4 contra el dataset completo.
+
+---
+
+### Entrada 11 — 2026-09-25
+
+**Prompt del usuario:**
+> revisa los cambios para actualizar la integracion. Incorpora el ranking
+> como primer parametro para las recomendaciones y las estadisticas de la
+> de los actores o directores como parametro secuandario, entro de los
+> gustos del usuario
+
+**Contexto:** el equipo mergeo dos cosas nuevas a `develop` desde la ultima
+sesion: `rankings.py` implementado por completo (PR #11,
+`feature/add-rankings-module`) y una reescritura de `busqueda.py` (PR #10,
+`feature/busqueda-formato-resultados`) que agrega un parametro
+`resumen: bool = False` a todas sus funciones (formato compacto con id, vs.
+el objeto completo) y una nueva funcion publica `resumir_pelicula`.
+
+**Respuesta / propuesta de la IA:**
+1. **Integracion de rankings.py en recomendaciones.py**, interpretando el
+   pedido como: para actor y director, usar `rankings.ranking_actores`/
+   `ranking_directores` (que exigen un minimo de peliculas por persona,
+   `MINIMO_PELICULAS_RANKING = 2`) como fuente **primaria** del promedio
+   historico en `recomendar_por_ranking`, y el promedio "crudo" de
+   `estadisticas.promedio_por_actor`/`_director` (sin piso minimo) como
+   fuente **secundaria/respaldo** para las personas que no llegan a ese
+   minimo. Genero e idioma se dejaron como estaban (solo
+   `estadisticas.py`): genero porque son pocas categorias fijas sin
+   problema de dispersion, e idioma porque `rankings.py` no tiene una
+   funcion de ranking de idiomas. Se agrego el helper
+   `_promedio_por_categoria_combinado` y la tabla
+   `FUNCIONES_RANKING_POR_CATEGORIA`.
+2. **Integracion de la nueva `busqueda.py` en `main.py`**: al revisar,
+   aparecieron 7 tests en `test_main.py` ya escritos por el equipo (PR #10)
+   pero marcados `@pytest.mark.skip` con una nota explicita ("requiere el
+   cableado de resumen=True en menu_busqueda") esperando a que alguien
+   conectara la funcionalidad en `main.py`. Se implementaron los dos
+   helpers que esos tests ya daban por sentado
+   (`_mostrar_listado_peliculas`, formato compacto con id;
+   `_mostrar_detalle_peliculas`, ficha completa) y se recableo
+   `menu_busqueda`: la busqueda por titulo (opcion 1) sigue mostrando la
+   ficha completa (`resumen=False`, default), y el resto de las opciones
+   (actor, director, genero, pais, idioma, palabra clave, combinada) ahora
+   piden `resumen=True` y muestran el listado compacto. Se sacaron los dos
+   `@pytest.mark.skip`.
+
+**Decision del usuario:** Pendiente de confirmacion (cambio recien aplicado,
+el usuario todavia no lo reviso).
+
+**Como se comprobo que funciona:**
+1. Se verifico a mano, contra el dataset real, que el helper combinado
+   efectivamente usa `rankings.py` cuando una persona llega al minimo
+   (ej. "Tom Hanks", con varias peliculas) y cae a `estadisticas.py` cuando
+   no (ej. un actor con una sola pelicula, "Brandon Obray"): 202.735
+   actores en total, solo 72.797 califican para la fuente primaria, y el
+   diccionario combinado cubre los 202.735 usando la fuente correcta en
+   cada caso.
+2. Se agregaron tests unitarios nuevos (`TestPromedioPorCategoriaCombinado`)
+   mockeando `FUNCIONES_RANKING_POR_CATEGORIA` (no `rankings.ranking_actores`
+   directamente, porque esa referencia ya quedo capturada al importar el
+   modulo) para probar el mecanismo de fallback de forma aislada, mas dos
+   tests funcionales contra el dataset real replicando la verificacion
+   manual (Tom Hanks via primaria, un actor de 1 pelicula via secundaria).
+3. Para la integracion de busqueda, la suite completa paso de 130 tests (0
+   skipped, ya sin los de crud/busqueda/rankings porque estaban mergeados)
+   a **135 passed, 0 skipped** una vez cableado `menu_busqueda` y sacados
+   los `@pytest.mark.skip`.
+4. Se detecto que `data/movies_unified.json` paso de 45.433 a 45.432
+   peliculas durante la sesion, con el archivo modificado muy recientemente.
+   Se investigo antes de tocar nada: el archivo esta internamente
+   consistente (sin duplicados de id, sin ids nulos, sin titulos de prueba
+   filtrados de los tests), y ninguno de los tests de esta sesion escribe
+   sobre la ruta real (se reviso `test_main.py` y `test_crud.py` linea por
+   linea). La explicacion mas probable es que el usuario corrio `main.py`
+   por su cuenta y probo "eliminar pelicula" (el fix de la Entrada 8). No se
+   modifico el archivo.
+
+**Nota de proceso:** el trabajo se hizo estando parado en `develop` (el
+usuario habia mergeado ahi las ramas anteriores). El usuario recordo
+explicitamente aplicar el guardrail de `CLAUDE.md`; se creo la rama
+`feature/integracion-rankings-y-busqueda-resumen` antes de seguir.
