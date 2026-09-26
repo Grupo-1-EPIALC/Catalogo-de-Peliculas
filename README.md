@@ -127,7 +127,7 @@ IA en [`CLAUDE.md`](CLAUDE.md).
 - [x] `main.py` (menu por consola) implementado
 - [x] `crud.py` implementado (listo en rama `feature/implementacion-crud`, falta mergear)
 - [x] `busqueda.py` implementado (listo en rama `feature/busqueda-peliculas`, falta mergear)
-- [ ] `rankings.py` implementado
+- [x] `rankings.py` implementado
 - [x] Exploracion de datos (EDA)
 - [x] Limpieza y transformacion adicional
 - [ ] Analisis / modelo
@@ -138,6 +138,5 @@ El reparto queda asi:
 * Dario - crud.py
 * Elian - busqueda.py
 * Lucho - rankings.py
-
 * Andres - estadisticas.py, recomendaciones.py y main.py o 
 ### Recuerden que deberia estar subido al repo el jueves a la noche a mas tardar
