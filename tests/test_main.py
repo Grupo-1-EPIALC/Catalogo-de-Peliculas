@@ -44,17 +44,6 @@ class TestPedirLista:
         assert main._pedir_lista("Generos: ") == ["Drama", "Comedy"]
 
 
-class TestOrdenarPorValorDesc:
-    def test_ordena_de_mayor_a_menor(self):
-        entrada = {"Drama": 5.0, "Comedy": 8.0, "Horror": 6.5}
-        assert list(main._ordenar_por_valor_desc(entrada).items()) == [
-            ("Comedy", 8.0), ("Horror", 6.5), ("Drama", 5.0),
-        ]
-
-    def test_diccionario_vacio(self):
-        assert main._ordenar_por_valor_desc({}) == {}
-
-
 class TestMostrarResultado:
     def test_resultado_none(self, capsys):
         main._mostrar_resultado(None)
@@ -120,30 +109,58 @@ class TestEstructuraDeMenus:
 
 class TestMenuEstadisticasFuncional:
     """Smoke test funcional: simula al usuario navegando el submenu de
-    estadisticas (opcion 8 = resumen general, despues 0 = volver) contra un
-    catalogo en memoria, usando estadisticas.py real. No depende de crud.py
-    ni de leer ningun archivo."""
+    estadisticas (que filtra con busqueda.py real y resume con
+    estadisticas.py real) contra un catalogo en memoria. No depende de
+    crud.py ni de leer ningun archivo."""
 
     @pytest.fixture
     def catalogo(self) -> list[dict]:
         return [
             {"id": 1, "title": "A", "vote_average": 8.0, "runtime": 100.0,
-             "popularity": "10.0", "genres": [], "directors": [], "cast": [],
-             "production_countries": [], "spoken_languages": [], "release_date": "2000-01-01"},
+             "popularity": "10.0", "genres": ["Comedy"], "directors": ["DirX"], "cast": ["ActorX"],
+             "production_countries": ["USA"], "spoken_languages": ["English"], "release_date": "2000-01-01"},
             {"id": 2, "title": "B", "vote_average": 6.0, "runtime": 120.0,
-             "popularity": "20.0", "genres": [], "directors": [], "cast": [],
-             "production_countries": [], "spoken_languages": [], "release_date": "2001-01-01"},
+             "popularity": "20.0", "genres": ["Drama"], "directors": ["DirY"], "cast": ["ActorY"],
+             "production_countries": ["France"], "spoken_languages": ["French"], "release_date": "2001-01-01"},
         ]
 
-    def test_opcion_resumen_muestra_totales_correctos(self, catalogo, monkeypatch, capsys):
-        respuestas = iter(["8", "0"])
+    def test_opcion_genero_filtra_y_muestra_resumen(self, catalogo, monkeypatch, capsys):
+        respuestas = iter(["1", "Comedy", "0"])
         monkeypatch.setattr(builtins, "input", lambda _: next(respuestas))
 
         main.menu_estadisticas(catalogo)
 
         salida = capsys.readouterr().out
-        assert "total_peliculas: 2" in salida
-        assert "promedio_vote_average: 7.0" in salida
+        assert "Cantidad de peliculas: 1" in salida
+        assert "vote_average -> media: 8.0" in salida
+
+    def test_opcion_anio_muestra_el_rango_disponible_y_filtra(self, catalogo, monkeypatch, capsys):
+        respuestas = iter(["6", "2000", "0"])
+        monkeypatch.setattr(builtins, "input", lambda _: next(respuestas))
+
+        main.menu_estadisticas(catalogo)
+
+        salida = capsys.readouterr().out
+        assert "Anios disponibles: 2000 - 2001" in salida
+        assert "Cantidad de peliculas: 1" in salida
+
+    def test_opcion_general_no_pide_ningun_valor_y_muestra_top5(self, catalogo, monkeypatch, capsys):
+        # la opcion 7 no filtra nada (a diferencia de 1 a 6): solo hacen
+        # falta 2 respuestas (elegir la opcion, y despues volver al menu)
+        respuestas = iter(["7", "0"])
+        monkeypatch.setattr(builtins, "input", lambda _: next(respuestas))
+
+        main.menu_estadisticas(catalogo)
+
+        salida = capsys.readouterr().out
+        assert "Cantidad de peliculas: 2" in salida
+        assert "Promedio normalizado combinado (escala 1-10):" in salida
+        assert "Top 5 generos (vote_average):" in salida
+        assert "Top 5 directores (vote_average):" in salida
+        assert "Top 5 actores (vote_average):" in salida
+        assert "Top 5 paises (vote_average):" in salida
+        assert "Top 5 idiomas (vote_average):" in salida
+        assert "Top 5 anios (vote_average):" in salida
 
     def test_opcion_invalida_no_rompe_y_vuelve_a_mostrar_el_menu(self, catalogo, monkeypatch, capsys):
         respuestas = iter(["99", "0"])

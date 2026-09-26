@@ -144,6 +144,74 @@ class TestCrearPerfilUsuario:
         }
 
 
+class TestPersistenciaDePerfiles:
+    """cargar_perfiles/guardar_perfiles, ver el docstring del modulo: los
+    perfiles se guardan en un JSON separado del catalogo de peliculas."""
+
+    def test_guardar_y_cargar_conserva_los_perfiles(self, tmp_path):
+        ruta = tmp_path / "perfiles.json"
+        perfiles = [{"id": 1, "nombre": "Ana", "generos": ["Drama"], "directores": [], "actores": [], "idiomas": []}]
+
+        recomendaciones.guardar_perfiles(perfiles, str(ruta))
+        cargados = recomendaciones.cargar_perfiles(str(ruta))
+
+        assert cargados == perfiles
+
+    def test_archivo_inexistente_devuelve_lista_vacia(self, tmp_path):
+        ruta = tmp_path / "no_existe.json"
+        assert recomendaciones.cargar_perfiles(str(ruta)) == []
+
+    def test_archivo_corrupto_devuelve_lista_vacia(self, tmp_path):
+        ruta = tmp_path / "corrupto.json"
+        ruta.write_text("esto no es json valido", encoding="utf-8")
+        assert recomendaciones.cargar_perfiles(str(ruta)) == []
+
+
+class TestCrudDePerfiles:
+    def test_agregar_perfil_le_asigna_id_1_al_primero(self):
+        perfiles = recomendaciones.agregar_perfil([], "Ana", ["Drama"], [], [], [])
+        assert perfiles[0]["id"] == 1
+        assert perfiles[0]["nombre"] == "Ana"
+
+    def test_agregar_perfil_incrementa_el_id_segun_el_mayor_existente(self):
+        perfiles = [{"id": 5, "nombre": "Viejo"}]
+        perfiles = recomendaciones.agregar_perfil(perfiles, "Nuevo", [], [], [], [])
+        assert perfiles[-1]["id"] == 6
+
+    def test_dos_usuarios_pueden_llamarse_igual_con_distinto_id(self):
+        perfiles = recomendaciones.agregar_perfil([], "Ana", [], [], [], [])
+        perfiles = recomendaciones.agregar_perfil(perfiles, "Ana", [], [], [], [])
+        assert perfiles[0]["id"] != perfiles[1]["id"]
+        assert perfiles[0]["nombre"] == perfiles[1]["nombre"] == "Ana"
+
+    def test_obtener_perfil_por_id_encontrado(self):
+        perfiles = recomendaciones.agregar_perfil([], "Ana", [], [], [], [])
+        assert recomendaciones.obtener_perfil_por_id(perfiles, perfiles[0]["id"])["nombre"] == "Ana"
+
+    def test_obtener_perfil_por_id_inexistente_devuelve_none(self):
+        assert recomendaciones.obtener_perfil_por_id([], 999) is None
+
+    def test_actualizar_perfil_modifica_el_campo_pedido(self):
+        perfiles = recomendaciones.agregar_perfil([], "Ana", ["Drama"], [], [], [])
+        id_ana = perfiles[0]["id"]
+        perfiles = recomendaciones.actualizar_perfil(perfiles, id_ana, {"generos": ["Comedy"]})
+        assert recomendaciones.obtener_perfil_por_id(perfiles, id_ana)["generos"] == ["Comedy"]
+
+    def test_actualizar_perfil_inexistente_lanza_value_error(self):
+        with pytest.raises(ValueError):
+            recomendaciones.actualizar_perfil([], 999, {"nombre": "Nadie"})
+
+    def test_eliminar_perfil_lo_saca_de_la_lista(self):
+        perfiles = recomendaciones.agregar_perfil([], "Ana", [], [], [], [])
+        id_ana = perfiles[0]["id"]
+        perfiles = recomendaciones.eliminar_perfil(perfiles, id_ana)
+        assert perfiles == []
+
+    def test_eliminar_perfil_inexistente_lanza_value_error(self):
+        with pytest.raises(ValueError):
+            recomendaciones.eliminar_perfil([], 999)
+
+
 class TestCalcularAfinidad:
     """calcular_afinidad no llama a busqueda.py (usa su propia comparacion
     normalizada, ver TestComparacionNormalizada), asi que no necesita el

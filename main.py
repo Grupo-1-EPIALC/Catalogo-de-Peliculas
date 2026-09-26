@@ -21,10 +21,13 @@ Funciones auxiliares (entrada/salida por consola):
 - _pedir_entero
 - _pedir_lista
 - _mostrar_resultado
-- _ordenar_por_valor_desc
 - _mostrar_listado_peliculas
 - _mostrar_detalle_peliculas
+- _mostrar_resumen_de_campos
+- _mostrar_perfiles
 """
+
+import sys
 
 import crud
 import busqueda
@@ -34,7 +37,12 @@ import recomendaciones
 
 
 # Ruta del archivo con el catalogo unificado generado por `eda dataset.ipynb`.
-RUTA_DATOS = "data/movies_unified.json"
+#RUTA_DATOS = "data/movies_unified.json"
+RUTA_DATOS = 'data/movies_sample_representativa.json'
+
+# Ruta del archivo con los perfiles de usuario de recomendaciones.py
+# (separado del catalogo de peliculas: son entidades distintas).
+RUTA_PERFILES = "data/perfiles_usuario.json"
 
 MENU_PRINCIPAL: dict[int, str] = {
     1: "Busqueda",
@@ -83,23 +91,26 @@ MENU_RANKINGS: dict[int, str] = {
 
 # estadisticas.py
 MENU_ESTADISTICAS: dict[int, str] = {
-    1: "Promedio general de un campo",
-    2: "Promedio por genero",
-    3: "Promedio por director",
-    4: "Promedio por actor",
-    5: "Promedio por pais",
-    6: "Promedio por idioma",
-    7: "Cantidad de peliculas por anio",
-    8: "Resumen estadistico general",
+    1: "Genero",
+    2: "Director",
+    3: "Actor",
+    4: "Pais",
+    5: "Idioma",
+    6: "Anio",
+    7: "General (todo el catalogo)",
     0: "Volver al menu principal",
 }
 
 # recomendaciones.py
 MENU_RECOMENDACIONES: dict[int, str] = {
     1: "Crear perfil de usuario",
-    2: "Ver peliculas afines al perfil (sin ordenar)",
-    3: "Recomendacion por ranking",
-    4: "Recomendacion al azar",
+    2: "Ver perfiles guardados",
+    3: "Usar un perfil guardado",
+    4: "Editar perfil guardado",
+    5: "Eliminar perfil guardado",
+    6: "Ver peliculas afines al perfil activo (sin ordenar)",
+    7: "Recomendacion por ranking",
+    8: "Recomendacion al azar",
     0: "Volver al menu principal",
 }
 
@@ -132,18 +143,6 @@ def _pedir_lista(mensaje: str) -> list[str]:
 # claves (ej. promedio_por_actor sobre el dataset completo), asi que sin este
 # limite la consola quedaria inundada de lineas.
 _LIMITE_RESULTADOS_MOSTRADOS = 20
-
-
-# Parametros:
-#   diccionario (dict[str, float]): resultado de una funcion de promedios
-#       (ej. promedio_por_genero, promedio_por_director).
-# Retorna:
-#   dict[str, float]: el mismo diccionario ordenado de mayor a menor valor,
-#       para que al truncar con _LIMITE_RESULTADOS_MOSTRADOS se muestren
-#       primero los promedios mas altos (los mas relevantes) y no un
-#       subconjunto arbitrario.
-def _ordenar_por_valor_desc(diccionario: dict[str, float]) -> dict[str, float]:
-    return dict(sorted(diccionario.items(), key=lambda item: item[1], reverse=True))
 
 
 # Parametros:
@@ -407,9 +406,48 @@ def menu_rankings(catalogo: list[dict]) -> None:
 
 
 # Parametros:
+#   resumen (dict): resultado de estadisticas.resumen_de_campos.
+# Retorna:
+#   None. Imprime la cantidad de peliculas, la media y mediana de cada campo
+#       numerico (estadisticas.CAMPOS_NUMERICOS) y el promedio normalizado
+#       combinado (escala 1-10).
+def _mostrar_resumen_de_campos(resumen: dict) -> None:
+    print(f"Cantidad de peliculas: {resumen['cantidad_peliculas']}")
+    for campo in estadisticas.CAMPOS_NUMERICOS:
+        media = resumen["medias"][campo]
+        mediana = resumen["medianas"][campo]
+        print(f"{campo} -> media: {media} | mediana: {mediana}")
+    print(f"Promedio normalizado combinado (escala 1-10): {resumen['promedio_normalizado_combinado']}")
+
+
+# Parametros:
+#   perfiles (list[dict]): perfiles de usuario de recomendaciones.py.
+# Retorna:
+#   None. Imprime id, nombre y preferencias de cada perfil. "No hay perfiles
+#       guardados." si la lista esta vacia.
+def _mostrar_perfiles(perfiles: list[dict]) -> None:
+    if not perfiles:
+        print("No hay perfiles guardados.")
+        return
+    for perfil in perfiles:
+        print(
+            f"{perfil['id']}: {perfil['nombre']}"
+            f" | generos: {perfil['generos']}"
+            f" | directores: {perfil['directores']}"
+            f" | actores: {perfil['actores']}"
+            f" | idiomas: {perfil['idiomas']}"
+        )
+
+
+# Parametros:
 #   catalogo (list[dict]): catalogo de peliculas ya cargado en memoria.
 # Retorna:
-#   None. Este submenu solo consulta datos (estadisticas.py).
+#   None. Este submenu solo consulta datos (busqueda.py + estadisticas.py),
+#       no modifica el catalogo. Las opciones 1 a 6 filtran el catalogo por
+#       un valor de esa categoria (via busqueda.py, que ya soporta genero en
+#       castellano o ingles) y muestran sus estadisticas
+#       (estadisticas.resumen_de_campos); la opcion 7 hace lo mismo sobre el
+#       catalogo completo y ademas muestra el top 5 de cada categoria.
 def menu_estadisticas(catalogo: list[dict]) -> None:
     while True:
         print("\n--- Estadisticas ---")
@@ -419,40 +457,65 @@ def menu_estadisticas(catalogo: list[dict]) -> None:
         if opcion == 0:
             return
         if opcion == 1:
-            campo = input("Campo numerico (vote_average, runtime, budget, revenue, popularity): ")
-            resultado = estadisticas.promedio_general(catalogo, campo)
+            valor = input("Genero a consultar: ")
+            subconjunto = busqueda.buscar_por_genero(catalogo, valor)
         elif opcion == 2:
-            campo = input("Campo numerico: ")
-            resultado = _ordenar_por_valor_desc(estadisticas.promedio_por_genero(catalogo, campo))
+            valor = input("Director a consultar: ")
+            subconjunto = busqueda.buscar_por_director(catalogo, valor)
         elif opcion == 3:
-            campo = input("Campo numerico: ")
-            resultado = _ordenar_por_valor_desc(estadisticas.promedio_por_director(catalogo, campo))
+            valor = input("Actor a consultar: ")
+            subconjunto = busqueda.buscar_por_actor(catalogo, valor)
         elif opcion == 4:
-            campo = input("Campo numerico: ")
-            resultado = _ordenar_por_valor_desc(estadisticas.promedio_por_actor(catalogo, campo))
+            valor = input("Pais a consultar: ")
+            subconjunto = busqueda.buscar_por_pais(catalogo, valor)
         elif opcion == 5:
-            campo = input("Campo numerico: ")
-            resultado = _ordenar_por_valor_desc(estadisticas.promedio_por_pais(catalogo, campo))
+            valor = input("Idioma a consultar: ")
+            subconjunto = busqueda.buscar_por_idioma(catalogo, valor)
         elif opcion == 6:
-            campo = input("Campo numerico: ")
-            resultado = _ordenar_por_valor_desc(estadisticas.promedio_por_idioma(catalogo, campo))
+            rango_anios = estadisticas.rango_de_anios(catalogo)
+            if rango_anios is not None:
+                print(f"Anios disponibles: {rango_anios[0]} - {rango_anios[1]}")
+            anio = _pedir_entero("Anio a consultar: ")
+            subconjunto = busqueda.busqueda_combinada(catalogo, {"anio_desde": anio, "anio_hasta": anio})
         elif opcion == 7:
-            resultado = dict(sorted(estadisticas.peliculas_por_anio(catalogo).items()))
-        elif opcion == 8:
-            resultado = estadisticas.resumen_estadistico(catalogo)
+            subconjunto = catalogo
         else:
             print("Opcion invalida.")
             continue
 
-        _mostrar_resultado(resultado)
+        _mostrar_resumen_de_campos(estadisticas.resumen_de_campos(catalogo, subconjunto))
+
+        if opcion == 7:
+            print("\nTop 5 generos (vote_average):")
+            _mostrar_resultado(estadisticas.top5_generos(catalogo))
+            print("\nTop 5 directores (vote_average):")
+            _mostrar_resultado(estadisticas.top5_directores(catalogo))
+            print("\nTop 5 actores (vote_average):")
+            _mostrar_resultado(estadisticas.top5_actores(catalogo))
+            print("\nTop 5 paises (vote_average):")
+            _mostrar_resultado(estadisticas.top5_paises(catalogo))
+            print("\nTop 5 idiomas (vote_average):")
+            _mostrar_resultado(estadisticas.top5_idiomas(catalogo))
+            print("\nTop 5 anios (vote_average):")
+            _mostrar_resultado(estadisticas.top5_anios(catalogo))
+
+
+# Campos de un perfil de usuario que se pueden editar con la opcion "Editar
+# perfil guardado" ("id" queda afuera: lo asigna agregar_perfil, no se edita).
+_CAMPOS_PERFIL_EDITABLES = {"nombre", "generos", "directores", "actores", "idiomas"}
 
 
 # Parametros:
 #   catalogo (list[dict]): catalogo de peliculas ya cargado en memoria.
 # Retorna:
-#   None. Este submenu solo consulta datos (recomendaciones.py); el perfil de
-#   usuario se guarda en memoria mientras dura el submenu (no se persiste).
+#   None. Los perfiles de usuario se cargan de RUTA_PERFILES al entrar al
+#       submenu y se persisten de inmediato con recomendaciones.guardar_perfiles
+#       cada vez que se crean/editan/eliminan (igual que menu_crud con el
+#       catalogo). El "perfil activo" (con el que se piden recomendaciones)
+#       vive solo en memoria durante el submenu: se elige con "Crear perfil
+#       de usuario" o "Usar un perfil guardado".
 def menu_recomendaciones(catalogo: list[dict]) -> None:
+    perfiles = recomendaciones.cargar_perfiles(RUTA_PERFILES)
     perfil_usuario: dict | None = None
 
     while True:
@@ -462,29 +525,69 @@ def menu_recomendaciones(catalogo: list[dict]) -> None:
 
         if opcion == 0:
             return
+
         if opcion == 1:
             nombre = input("Nombre del usuario: ")
             generos_preferidos = _pedir_lista("Generos preferidos (separados por coma): ")
             directores_preferidos = _pedir_lista("Directores preferidos (separados por coma): ")
             actores_preferidos = _pedir_lista("Actores preferidos (separados por coma): ")
             idiomas_preferidos = _pedir_lista("Idiomas preferidos (separados por coma): ")
-            perfil_usuario = recomendaciones.crear_perfil_usuario(
-                nombre, generos_preferidos, directores_preferidos, actores_preferidos, idiomas_preferidos
+            perfiles = recomendaciones.agregar_perfil(
+                perfiles, nombre, generos_preferidos, directores_preferidos, actores_preferidos, idiomas_preferidos
             )
-            print("Perfil creado.")
-            continue
-
-        if perfil_usuario is None:
-            print("Primero hay que crear un perfil de usuario (opcion 1).")
+            recomendaciones.guardar_perfiles(perfiles, RUTA_PERFILES)
+            perfil_usuario = perfiles[-1]
+            print(f"Perfil creado y guardado con id {perfil_usuario['id']}.")
             continue
 
         if opcion == 2:
+            _mostrar_perfiles(perfiles)
+            continue
+
+        if opcion == 3:
+            id_usuario = _pedir_entero("Id del perfil a usar: ")
+            encontrado = recomendaciones.obtener_perfil_por_id(perfiles, id_usuario)
+            if encontrado is None:
+                print(f"No existe ningun perfil con el id {id_usuario}.")
+            else:
+                perfil_usuario = encontrado
+                print(f"Perfil activo: {perfil_usuario['nombre']} (id {perfil_usuario['id']}).")
+            continue
+
+        if opcion in (4, 5):
+            try:
+                if opcion == 4:
+                    id_usuario = _pedir_entero("Id del perfil a editar: ")
+                    campo = input("Campo a modificar (nombre, generos, directores, actores, idiomas): ")
+                    if campo not in _CAMPOS_PERFIL_EDITABLES:
+                        print(f"'{campo}' no es un campo editable de un perfil.")
+                        continue
+                    nuevo_valor = input("Nuevo nombre: ") if campo == "nombre" else _pedir_lista(f"Nuevos {campo} (separados por coma): ")
+                    perfiles = recomendaciones.actualizar_perfil(perfiles, id_usuario, {campo: nuevo_valor})
+                    print("Perfil actualizado.")
+                else:
+                    id_usuario = _pedir_entero("Id del perfil a eliminar: ")
+                    perfiles = recomendaciones.eliminar_perfil(perfiles, id_usuario)
+                    if perfil_usuario is not None and perfil_usuario.get("id") == id_usuario:
+                        perfil_usuario = None
+                    print("Perfil eliminado.")
+            except ValueError as error:
+                print(f"No se pudo completar la operacion: {error}")
+                continue
+            recomendaciones.guardar_perfiles(perfiles, RUTA_PERFILES)
+            continue
+
+        if perfil_usuario is None:
+            print("Primero hay que crear o usar un perfil de usuario (opciones 1 o 3).")
+            continue
+
+        if opcion == 6:
             resultado = recomendaciones.filtrar_peliculas_por_gustos(catalogo, perfil_usuario)
-        elif opcion == 3:
+        elif opcion == 7:
             campo = input("Campo de puntuacion (vote_average, popularity): ")
             cantidad = _pedir_entero("Cantidad de recomendaciones: ")
             resultado = recomendaciones.recomendar_por_ranking(catalogo, perfil_usuario, campo, cantidad)
-        elif opcion == 4:
+        elif opcion == 8:
             cantidad = _pedir_entero("Cantidad de recomendaciones: ")
             resultado = recomendaciones.recomendar_al_azar(catalogo, perfil_usuario, cantidad)
         else:
@@ -498,12 +601,17 @@ def menu_recomendaciones(catalogo: list[dict]) -> None:
 # Retorna:
 #   None.
 # Flujo:
-#   1. Carga el catalogo una vez con crud.cargar_catalogo(RUTA_DATOS).
-#   2. Muestra el menu principal en un bucle y deriva cada opcion al submenu
+#   1. Fuerza la salida estandar a UTF-8: el catalogo tiene texto en idiomas
+#      con alfabetos que la consola de Windows (cp1252 por defecto) no puede
+#      imprimir (ej. cirilico, bengali), y sin esto la aplicacion se cae con
+#      UnicodeEncodeError apenas aparece uno.
+#   2. Carga el catalogo una vez con crud.cargar_catalogo(RUTA_DATOS).
+#   3. Muestra el menu principal en un bucle y deriva cada opcion al submenu
 #      del modulo correspondiente (busqueda, crud, rankings, estadisticas,
 #      recomendaciones).
-#   3. Al salir (opcion 0), persiste el catalogo con crud.guardar_catalogo.
+#   4. Al salir (opcion 0), persiste el catalogo con crud.guardar_catalogo.
 def main() -> None:
+    sys.stdout.reconfigure(encoding="utf-8")
     catalogo = crud.cargar_catalogo(RUTA_DATOS) or []
 
     while True:

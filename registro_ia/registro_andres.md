@@ -658,3 +658,112 @@ aplicados).
    archivo; se ajusto el ejemplo del manual para no depender de esa fila.
 6. Suite completa del repo: **151 passed** (sin skips — ya no queda ningun
    modulo sin implementar).
+
+---
+
+### Entrada 13 — 2026-09-25
+
+**Prompt del usuario (dos mensajes seguidos, el segundo corrige al primero):**
+> [1] En las estadisticas que me traiga todas las de mi eleccion y un
+> promedio de todas las de mi eleccion (llevando todas las magnitudes
+> obviamente a una misma escala de 1 a 10)
+>
+> [2] entendiste para cualquier lado, en lugar de preguntarme de que valor
+> numerico sacar las estadisticas mostrame de mi eleccion las de los
+> distintos campos numericos + el promedio normalizado de esos campos
+
+**Contexto:** el primer pedido se interpreto (mal, segun la correccion) como
+"agregar una opcion de menu que pida una lista de campos separados por coma
+y calcule su promedio normalizado". El usuario aclaro que NO habia que
+preguntar nada: mostrar directamente el promedio (y promedio normalizado) de
+**todos** los campos numericos de una vez. Se implemento eso: nueva opcion 9
+en Estadisticas que, sin pedir ningun input ademas de elegir la opcion,
+muestra los 6 campos de `estadisticas.CAMPOS_NUMERICOS` (original + escala
+1-10) y el combinado.
+
+**Decision del usuario sobre esa primera correccion:** Rechazada la primera
+implementacion (pedia campos por consola); aceptada la segunda (sin pedir
+nada). Peeeero, en el mismo intercambio, el usuario siguio corrigiendo con
+una historia de usuario completa (ver mas abajo), asi que esta Entrada 13
+documenta ambas vueltas.
+
+---
+
+**Prompt del usuario (correccion final, historia de usuario completa):**
+> Vamos de nuevo a ver si esta vez me explico mejor con una historia de
+> usuario: El usuario elige estadisticas en el menu, el sub menu de
+> estadisticas le sa la opcion de ejegir genero, director, actor, pais,
+> idioma, anio y un general sin esos filtros. Dentro de cada opcion va a ver
+> la media y mediana de cada valor y un promedio normalizado de todos los
+> valores, junto con la cantidad de peliculas. En el general ademas le vas a
+> agregregar el top 5 de cada filtro. No sumes a lo que hay sino que corregi
+> el archivo y el menu
+
+**Respuesta / propuesta de la IA:** Rediseño completo (no aditivo, como pidio
+explicitamente el usuario) de `estadisticas.py` y del submenu de
+Estadisticas en `main.py`:
+
+1. **`estadisticas.py`**: se eliminaron `peliculas_por_anio`,
+   `resumen_estadistico`, `promedios_multiples` y la version vieja de 2
+   argumentos de `promedio_normalizado` (ya no se usaban en el nuevo diseño).
+   Se agregaron: `mediana_general`, `_anio_estreno`, `_promedio_por_anio`,
+   `_top5`, `top5_generos`/`_directores`/`_actores`/`_paises`/`_idiomas`/`_anios`,
+   `resumen_de_campos(catalogo_referencia, subconjunto)` (cantidad, media y
+   mediana de cada campo numerico, y un promedio normalizado combinado), y
+   se redisenio `promedio_normalizado` para recibir DOS catalogos: uno de
+   referencia (de donde sale el minimo/maximo para normalizar) y un
+   subconjunto (del que se calcula el promedio real) — asi un filtro de
+   "Comedy" y uno de "Horror" quedan en la misma escala de 1 a 10 y se
+   pueden comparar entre si, en vez de que cada uno normalice contra su
+   propio rango.
+   **Importante:** se mantuvieron intactas `promedio_por_genero`/
+   `_director`/`_actor`/`_pais`/`_idioma` (y su helper `_promedio_por_categoria`)
+   aunque ya no tienen una opcion de menu propia, porque `recomendaciones.py`
+   las usa internamente (`CAMPOS_PREFERENCIA`) para el promedio historico de
+   las categorias preferidas del usuario — removerlas hubiera roto las
+   recomendaciones sin que el usuario lo pidiera ni se diera cuenta.
+2. **`main.py`**: `MENU_ESTADISTICAS` paso de 9 opciones ("Promedio general
+   de un campo", "Promedio por genero", etc.) a 7: Genero, Director, Actor,
+   Pais, Idioma, Anio, General. Las opciones 1 a 6 piden el valor a filtrar y
+   usan `busqueda.py` real para filtrar (reutilizando la traduccion
+   castellano/ingles de genero de la Entrada 12 sin cambios); la opcion 7
+   usa el catalogo completo. Todas muestran `estadisticas.resumen_de_campos`;
+   la opcion 7 ademas muestra los 6 `top5_*`. Se agrego el helper
+   `_mostrar_resumen_de_campos`. Se elimino `_ordenar_por_valor_desc` (helper
+   de main.py, quedo sin uso al sacar las opciones viejas de "promedio por
+   categoria ordenado").
+3. **Bug real encontrado durante la verificacion manual** (no relacionado al
+   pedido, pero bloqueaba probar la opcion 7): al mostrar el top 5 de
+   idiomas, dos nombres de idioma en el dataset real usan alfabetos que la
+   consola de Windows (codepage cp1252 por defecto) no puede codificar
+   ("беларуская мова" en cirilico, "বাংলা" en bengali) y la aplicacion
+   se caia con `UnicodeEncodeError`. Se agrego `sys.stdout.reconfigure(
+   encoding="utf-8")` al principio de `main()` para que la salida estandar
+   siempre acepte cualquier caracter Unicode.
+
+**Decision del usuario:** Pendiente de confirmacion (cambios recien
+aplicados; la primera vuelta de esta misma entrada ya fue explicitamente
+corregida por el usuario, ver arriba).
+
+**Como se comprobo que funciona:**
+1. Se corrio la opcion 1 (Genero = "terror" en castellano) contra el
+   dataset real: 4.671 peliculas (coincide con la Entrada 12), media/mediana
+   de los 6 campos y el combinado se calculan sin romper.
+2. Se corrio la opcion 7 (General) contra el dataset real end-to-end,
+   incluido el top 5 de las 6 categorias — reprodujo el crash de Unicode
+   antes del fix (con "беларуская мова"/"বাংলা" en el top 5 de idiomas), y
+   se confirmo que despues del fix corre limpio y esos nombres se ven
+   correctamente (verificado redirigiendo la salida a un archivo UTF-8, no
+   en la terminal).
+3. Se reescribio `tests/test_estadisticas.py` (38 tests: media, mediana,
+   normalizado con dos catalogos distintos —incluyendo un test especifico
+   que prueba que se usa el rango del catalogo de referencia y no el del
+   subconjunto—, resumen_de_campos, y los 6 top5_*) y
+   `tests/test_main.py` (`TestMenuEstadisticasFuncional` reescrita para el
+   nuevo menu; se elimino `TestOrdenarPorValorDesc`, que probaba el helper
+   removido).
+4. Suite completa del repo: **171 passed** (sin skips).
+
+**Nota de proceso:** ya se estaba en una rama propia
+(`fix-estadisticas-+-feature-recomendaciones`, no `develop`), asi que no
+hizo falta crear una rama nueva para este cambio.
