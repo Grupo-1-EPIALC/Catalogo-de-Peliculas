@@ -34,15 +34,7 @@ import busqueda
 import rankings
 import estadisticas
 import recomendaciones
-
-
-# Ruta del archivo con el catalogo unificado generado por `eda dataset.ipynb`.
-#RUTA_DATOS = "data/movies_unified.json"
-RUTA_DATOS = 'data/movies_sample_representativa.json'
-
-# Ruta del archivo con los perfiles de usuario de recomendaciones.py
-# (separado del catalogo de peliculas: son entidades distintas).
-RUTA_PERFILES = "data/perfiles_usuario.json"
+from env import RUTA_DATOS, RUTA_PERFILES
 
 MENU_PRINCIPAL: dict[int, str] = {
     1: "Busqueda",
@@ -302,6 +294,14 @@ def menu_busqueda(catalogo: list[dict]) -> None:
 #   catalogo (list[dict]): catalogo de peliculas ya cargado en memoria.
 # Retorna:
 #   list[dict]: el catalogo actualizado tras aplicar las operaciones del CRUD.
+# Flujo:
+#   crud.py es autosuficiente: cada funcion lee, modifica y persiste el JSON
+#   ella misma (ya no recibe `catalogo` por parametro), asi que aca no hace
+#   falta un guardar_catalogo manual. Pero su default (RUTA_DATOS_DEFECTO)
+#   apunta a otro archivo distinto del que esta app tiene cargado en
+#   `catalogo`, asi que hay que pasarle RUTA_DATOS explicitamente en cada
+#   llamada; si se omite, la operacion termina leyendo/escribiendo el
+#   archivo equivocado.
 def menu_crud(catalogo: list[dict]) -> list[dict]:
     while True:
         print("\n--- CRUD de peliculas ---")
@@ -313,14 +313,12 @@ def menu_crud(catalogo: list[dict]) -> list[dict]:
 
         if opcion == 1:
             titulo = input("Titulo de la pelicula a buscar: ")
-            # MODIFICACION: Nueva opcion 1 que consulta la ID usando el modulo crud
-            _mostrar_resultado(crud.obtener_id_por_titulo(titulo))
+            _mostrar_resultado(crud.obtener_id_por_titulo(titulo, RUTA_DATOS))
             continue
-        
+
         if opcion == 2:
             id_pelicula = _pedir_entero("Id de la pelicula: ")
-            # MODIFICACION: Se elimina el parametro 'catalogo', crud.py consulta directo la fuente
-            _mostrar_resultado(crud.obtener_pelicula_por_id(id_pelicula))
+            _mostrar_resultado(crud.obtener_pelicula_por_id(id_pelicula, RUTA_DATOS))
             continue
 
         try:
@@ -329,35 +327,29 @@ def menu_crud(catalogo: list[dict]) -> list[dict]:
                     "id": _pedir_entero("Id de la nueva pelicula: "),
                     "title": input("Titulo: "),
                 }
-                # MODIFICACION: Se elimina 'catalogo' como primer parametro. 
-                # crud.crear_pelicula se encarga de guardar en disco y devuelve el catalogo actualizado.
-                catalogo = crud.crear_pelicula(nueva_pelicula)
+                catalogo = crud.crear_pelicula(nueva_pelicula, RUTA_DATOS)
 
             elif opcion == 4:
                 id_pelicula = _pedir_entero("Id de la pelicula a editar: ")
                 campo = input("Campo a modificar (ej. title, vote_average, tagline): ")
                 valor = input("Nuevo valor: ")
-                # MODIFICACION: Se remueve el parametro 'catalogo'.
-                catalogo = crud.actualizar_pelicula(id_pelicula, {campo: valor})
+                catalogo = crud.actualizar_pelicula(id_pelicula, {campo: valor}, RUTA_DATOS)
 
             elif opcion == 5:
                 id_pelicula = _pedir_entero("Id de la pelicula a eliminar: ")
-                # MODIFICACION: Se remueve el parametro 'catalogo'.
-                catalogo = crud.eliminar_pelicula(id_pelicula)
+                catalogo = crud.eliminar_pelicula(id_pelicula, RUTA_DATOS)
 
             elif opcion == 6:
                 id_pelicula = _pedir_entero("Id de la pelicula: ")
                 campo_lista = input("Campo tipo lista (genres, cast, directors, keywords, production_companies, production_countries, spoken_languages): ")
                 valor = input("Valor a agregar: ")
-                # MODIFICACION: Se remueve el parametro 'catalogo'.
-                catalogo = crud.agregar_valor_a_lista(id_pelicula, campo_lista, valor)
+                catalogo = crud.agregar_valor_a_lista(id_pelicula, campo_lista, valor, RUTA_DATOS)
 
             elif opcion == 7:
                 id_pelicula = _pedir_entero("Id de la pelicula: ")
                 campo_lista = input("Campo tipo lista (genres, cast, directors, keywords, production_companies, production_countries, spoken_languages): ")
                 valor = input("Valor a quitar: ")
-                # MODIFICACION: Se remueve el parametro 'catalogo'.
-                catalogo = crud.quitar_valor_de_lista(id_pelicula, campo_lista, valor)
+                catalogo = crud.quitar_valor_de_lista(id_pelicula, campo_lista, valor, RUTA_DATOS)
 
             else:
                 print("Opcion invalida.")
@@ -368,10 +360,6 @@ def menu_crud(catalogo: list[dict]) -> list[dict]:
         except ValueError as error:
             print(f"No se pudo completar la operacion: {error}")
             continue
-
-        # MODIFICACION: Se elimino la llamada manual 'crud.guardar_catalogo(catalogo, RUTA_DATOS)' 
-        # que estaba aqui al final, ya que el modulo crud.py autosuficiente guarda en disco 
-        # e integra la persistencia dentro de cada operacion.
 
 
 # Parametros:
@@ -626,8 +614,8 @@ def menu_recomendaciones(catalogo: list[dict]) -> None:
 #   2. Carga el catalogo una vez con crud.cargar_catalogo(RUTA_DATOS).
 #   3. Muestra el menu principal en un bucle y deriva cada opcion al submenu
 #      del modulo correspondiente (busqueda, crud, rankings, estadisticas,
-#      recomendaciones).
-#   4. Al salir (opcion 0), persiste el catalogo con crud.guardar_catalogo.
+#      recomendaciones). El CRUD ya no necesita un guardado final: cada una
+#      de sus operaciones persiste el archivo por su cuenta (ver menu_crud).
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     catalogo = crud.cargar_catalogo(RUTA_DATOS) or []

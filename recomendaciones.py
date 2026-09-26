@@ -23,7 +23,7 @@ por categoria, de dos fuentes segun la categoria:
       funcion de ranking de idiomas.
 
 Los perfiles de usuario se persisten en un JSON aparte del catalogo de
-peliculas (ver `main.RUTA_PERFILES`), con un "id" numerico ademas del
+peliculas (ver `env.RUTA_PERFILES`), con un "id" numerico ademas del
 nombre: dos usuarios pueden llamarse igual, asi que el nombre solo no
 alcanza para identificar un perfil sin ambiguedad.
 
@@ -56,6 +56,7 @@ from typing import Callable
 import busqueda
 import estadisticas
 import rankings
+from env import RUTA_PERFILES
 
 # Cuanto suma cada preferencia coincidente (genero/director/actor/idioma) al
 # puntaje compuesto de recomendar_por_ranking. El puntaje propio de la
@@ -208,7 +209,7 @@ def crear_perfil_usuario(
 # Manejo de errores esperado:
 #   json.JSONDecodeError si el archivo esta mal formado: se informa y se
 #   devuelve una lista vacia en vez de dejar caer el programa.
-def cargar_perfiles(ruta_json: str) -> list[dict]:
+def cargar_perfiles(ruta_json: str = RUTA_PERFILES) -> list[dict]:
     try:
         with open(ruta_json, "r", encoding="utf-8") as archivo:
             datos = json.load(archivo)
@@ -230,7 +231,7 @@ def cargar_perfiles(ruta_json: str) -> list[dict]:
 #   None
 # Manejo de errores esperado:
 #   OSError si no se puede escribir el archivo (permisos, disco, ruta invalida).
-def guardar_perfiles(perfiles: list[dict], ruta_json: str) -> None:
+def guardar_perfiles(perfiles: list[dict], ruta_json: str = RUTA_PERFILES) -> None:
     try:
         with open(ruta_json, "w", encoding="utf-8") as archivo:
             json.dump(perfiles, archivo, ensure_ascii=False, indent=2)

@@ -12,6 +12,7 @@ implementado); no depende de crud.py ni busqueda.py.
 """
 
 import builtins
+import json
 
 import pytest
 
@@ -176,58 +177,78 @@ class TestMenuCrudFuncional:
     duplicado/inexistente, campo de lista invalido, etc. Estos tests son
     regresion de un bug real: antes de agregar el try/except en menu_crud,
     cualquiera de estos casos (perfectamente esperables por un uso normal)
-    tumbaba toda la aplicacion con una excepcion sin capturar."""
+    tumbaba toda la aplicacion con una excepcion sin capturar.
+
+    crud.py es autosuficiente (lee y persiste el JSON el mismo, ya no recibe
+    `catalogo` por parametro): estos tests necesitan que main.RUTA_DATOS
+    apunte a un archivo temporal, sembrado con el contenido de `catalogo`,
+    en vez de pasarle la lista directamente. Sin este aislamiento los tests
+    terminarian leyendo/escribiendo el archivo real de la aplicacion."""
 
     @pytest.fixture
     def catalogo(self) -> list[dict]:
         return [{"id": 1, "title": "Existente", "genres": ["Drama"]}]
 
-    def test_id_duplicado_al_crear_no_rompe_y_no_modifica_el_catalogo(self, catalogo, monkeypatch, capsys):
-        respuestas = iter(["2", "1", "Titulo Duplicado", "0"])
+    @pytest.fixture
+    def catalogo_en_archivo_temporal(self, catalogo, monkeypatch, tmp_path) -> list[dict]:
+        ruta = tmp_path / "catalogo_test.json"
+        ruta.write_text(json.dumps(catalogo), encoding="utf-8")
+        monkeypatch.setattr(main, "RUTA_DATOS", str(ruta))
+        return catalogo
+
+    def test_id_duplicado_al_crear_no_rompe_y_no_modifica_el_catalogo(
+        self, catalogo_en_archivo_temporal, monkeypatch, capsys
+    ):
+        respuestas = iter(["3", "1", "Titulo Duplicado", "0"])
         monkeypatch.setattr(builtins, "input", lambda _: next(respuestas))
 
-        resultado = main.menu_crud(catalogo)
+        resultado = main.menu_crud(catalogo_en_archivo_temporal)
 
         assert len(resultado) == 1
         assert "No se pudo completar la operacion" in capsys.readouterr().out
 
-    def test_id_inexistente_al_editar_no_rompe(self, catalogo, monkeypatch, capsys):
-        respuestas = iter(["3", "9999", "title", "Nuevo Titulo", "0"])
+    def test_id_inexistente_al_editar_no_rompe(self, catalogo_en_archivo_temporal, monkeypatch, capsys):
+        respuestas = iter(["4", "9999", "title", "Nuevo Titulo", "0"])
         monkeypatch.setattr(builtins, "input", lambda _: next(respuestas))
 
-        resultado = main.menu_crud(catalogo)
+        resultado = main.menu_crud(catalogo_en_archivo_temporal)
 
         assert resultado[0]["title"] == "Existente"
         assert "No se pudo completar la operacion" in capsys.readouterr().out
 
-    def test_id_inexistente_al_eliminar_no_rompe(self, catalogo, monkeypatch, capsys):
-        respuestas = iter(["4", "9999", "0"])
+    def test_id_inexistente_al_eliminar_no_rompe(self, catalogo_en_archivo_temporal, monkeypatch, capsys):
+        respuestas = iter(["5", "9999", "0"])
         monkeypatch.setattr(builtins, "input", lambda _: next(respuestas))
 
-        resultado = main.menu_crud(catalogo)
+        resultado = main.menu_crud(catalogo_en_archivo_temporal)
 
         assert len(resultado) == 1
         assert "No se pudo completar la operacion" in capsys.readouterr().out
 
-    def test_campo_lista_invalido_no_rompe(self, catalogo, monkeypatch, capsys):
-        respuestas = iter(["5", "1", "title", "no es una lista", "0"])
+    def test_campo_lista_invalido_no_rompe(self, catalogo_en_archivo_temporal, monkeypatch, capsys):
+        respuestas = iter(["6", "1", "title", "no es una lista", "0"])
         monkeypatch.setattr(builtins, "input", lambda _: next(respuestas))
 
-        main.menu_crud(catalogo)
+        main.menu_crud(catalogo_en_archivo_temporal)
 
         assert "No se pudo completar la operacion" in capsys.readouterr().out
 
-    def test_operacion_valida_sigue_funcionando(self, catalogo, monkeypatch, tmp_path):
-        # RUTA_DATOS apunta a un archivo temporal para no pisar data/movies_unified.json;
-        # monkeypatch restaura el valor original solo al terminar el test.
-        monkeypatch.setattr(main, "RUTA_DATOS", str(tmp_path / "catalogo_test.json"))
-        respuestas = iter(["2", "2", "Pelicula Nueva", "0"])
+    def test_operacion_valida_sigue_funcionando(self, catalogo_en_archivo_temporal, monkeypatch):
+        respuestas = iter(["3", "2", "Pelicula Nueva", "0"])
         monkeypatch.setattr(builtins, "input", lambda _: next(respuestas))
 
-        resultado = main.menu_crud(catalogo)
+        resultado = main.menu_crud(catalogo_en_archivo_temporal)
 
         assert len(resultado) == 2
         assert any(p["id"] == 2 and p["title"] == "Pelicula Nueva" for p in resultado)
+
+    def test_buscar_id_por_titulo(self, catalogo_en_archivo_temporal, monkeypatch, capsys):
+        respuestas = iter(["1", "Existente", "0"])
+        monkeypatch.setattr(builtins, "input", lambda _: next(respuestas))
+
+        main.menu_crud(catalogo_en_archivo_temporal)
+
+        assert "1" in capsys.readouterr().out
 
 
 class TestMostrarListadoYDetallePeliculas:

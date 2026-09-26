@@ -1,8 +1,9 @@
 """
 crud.py
 
-Operaciones CRUD (Create, Read, Update, Delete) sobre el catálogo de películas
-unificado en `data/movies_unified.json`.
+Operaciones CRUD (Create, Read, Update, Delete) sobre el catálogo de películas.
+La ruta por defecto (`env.RUTA_DATOS`) esta centralizada en `env.py` junto con
+las demas rutas de archivos de la aplicacion.
 
 Cada "pelicula" es un dict con (entre otras) las claves:
     id (int), title (str), original_title (str), overview (str), tagline (str | None),
@@ -39,6 +40,8 @@ Funciones que contiene:
 
 import json
 
+from env import RUTA_DATOS
+
 _CAMPOS_LISTA_VALIDOS = {
     "genres",
     "production_companies",
@@ -49,8 +52,6 @@ _CAMPOS_LISTA_VALIDOS = {
     "keywords",
 }
 
-RUTA_DATOS_DEFECTO = "data/movies_unified.json"
-
 
 # Parámetros:
 #   ruta_json (str): ruta al archivo JSON con el catálogo de películas.
@@ -60,7 +61,7 @@ RUTA_DATOS_DEFECTO = "data/movies_unified.json"
 #   FileNotFoundError si la ruta no existe, json.JSONDecodeError si el archivo
 #   está mal formado. En ambos casos informar un mensaje claro (no dejar que
 #   el programa se caiga) y devolver una lista vacía.
-def cargar_catalogo(ruta_json: str = RUTA_DATOS_DEFECTO) -> list[dict]:
+def cargar_catalogo(ruta_json: str = RUTA_DATOS) -> list[dict]:
     try:
         with open(ruta_json, "r", encoding="utf-8") as archivo:
             datos = json.load(archivo)
@@ -83,7 +84,7 @@ def cargar_catalogo(ruta_json: str = RUTA_DATOS_DEFECTO) -> list[dict]:
 #   None
 # Manejo de errores esperado:
 #   OSError si no se puede escribir el archivo (permisos, disco, ruta inválida).
-def guardar_catalogo(catalogo: list[dict], ruta_json: str = RUTA_DATOS_DEFECTO) -> None:
+def guardar_catalogo(catalogo: list[dict], ruta_json: str = RUTA_DATOS) -> None:
     try:
         with open(ruta_json, "w", encoding="utf-8") as archivo:
             json.dump(catalogo, archivo, ensure_ascii=False, indent=2)
@@ -96,7 +97,7 @@ def guardar_catalogo(catalogo: list[dict], ruta_json: str = RUTA_DATOS_DEFECTO) 
 #   ruta_json (str): ruta al archivo JSON con el catálogo.
 # Retorna:
 #   dict | None: la película encontrada, o None si no existe ese id.
-def obtener_pelicula_por_id(id_pelicula: int, ruta_json: str = RUTA_DATOS_DEFECTO) -> dict | None:
+def obtener_pelicula_por_id(id_pelicula: int, ruta_json: str = RUTA_DATOS) -> dict | None:
     catalogo = cargar_catalogo(ruta_json)
     try:
         return next(pelicula for pelicula in catalogo if pelicula.get("id") == id_pelicula)
@@ -109,7 +110,7 @@ def obtener_pelicula_por_id(id_pelicula: int, ruta_json: str = RUTA_DATOS_DEFECT
 #   ruta_json (str): ruta al archivo JSON con el catálogo.
 # Retorna:
 #   int | None: el ID de la película encontrada (coincidencia exacta case-insensitive), o None si no existe.
-def obtener_id_por_titulo(titulo: str, ruta_json: str = RUTA_DATOS_DEFECTO) -> int | None:
+def obtener_id_por_titulo(titulo: str, ruta_json: str = RUTA_DATOS) -> int | None:
     catalogo = cargar_catalogo(ruta_json)
     titulo_normalizado = titulo.strip().lower()
     try:
@@ -128,7 +129,7 @@ def obtener_id_por_titulo(titulo: str, ruta_json: str = RUTA_DATOS_DEFECTO) -> i
 #   list[dict]: catálogo actualizado y persistido leídos desde el archivo.
 # Manejo de errores esperado:
 #   ValueError si no incluye campos obligatorios o si ya existe una película con el mismo "id".
-def crear_pelicula(nueva_pelicula: dict, ruta_json: str = RUTA_DATOS_DEFECTO) -> list[dict]:
+def crear_pelicula(nueva_pelicula: dict, ruta_json: str = RUTA_DATOS) -> list[dict]:
     try:
         id_nueva = nueva_pelicula["id"]
         _ = nueva_pelicula["title"]
@@ -155,7 +156,7 @@ def crear_pelicula(nueva_pelicula: dict, ruta_json: str = RUTA_DATOS_DEFECTO) ->
 # Manejo de errores esperado:
 #   ValueError si no existe una película con ese id.
 def actualizar_pelicula(
-    id_pelicula: int, campos_actualizados: dict, ruta_json: str = RUTA_DATOS_DEFECTO
+    id_pelicula: int, campos_actualizados: dict, ruta_json: str = RUTA_DATOS
 ) -> list[dict]:
     catalogo = cargar_catalogo(ruta_json)
     try:
@@ -174,7 +175,7 @@ def actualizar_pelicula(
 #   list[dict]: catálogo actualizado sin la película eliminada.
 # Manejo de errores esperado:
 #   ValueError si no existe una película con ese id.
-def eliminar_pelicula(id_pelicula: int, ruta_json: str = RUTA_DATOS_DEFECTO) -> list[dict]:
+def eliminar_pelicula(id_pelicula: int, ruta_json: str = RUTA_DATOS) -> list[dict]:
     catalogo = cargar_catalogo(ruta_json)
     try:
         pelicula = next(p for p in catalogo if p.get("id") == id_pelicula)
@@ -197,7 +198,7 @@ def eliminar_pelicula(id_pelicula: int, ruta_json: str = RUTA_DATOS_DEFECTO) -> 
 # Manejo de errores esperado:
 #   ValueError si no existe la película o si campo_lista no es un campo de tipo lista.
 def agregar_valor_a_lista(
-    id_pelicula: int, campo_lista: str, valor: str, ruta_json: str = RUTA_DATOS_DEFECTO
+    id_pelicula: int, campo_lista: str, valor: str, ruta_json: str = RUTA_DATOS
 ) -> list[dict]:
     if campo_lista not in _CAMPOS_LISTA_VALIDOS:
         raise ValueError(f"El campo '{campo_lista}' no es un campo válido de tipo lista.")
@@ -226,7 +227,7 @@ def agregar_valor_a_lista(
 #   ValueError si no existe la película, si campo_lista no es una lista, o si
 #   el valor no estaba presente en la lista.
 def quitar_valor_de_lista(
-    id_pelicula: int, campo_lista: str, valor: str, ruta_json: str = RUTA_DATOS_DEFECTO
+    id_pelicula: int, campo_lista: str, valor: str, ruta_json: str = RUTA_DATOS
 ) -> list[dict]:
     if campo_lista not in _CAMPOS_LISTA_VALIDOS:
         raise ValueError(f"El campo '{campo_lista}' no es un campo válido de tipo lista.")
