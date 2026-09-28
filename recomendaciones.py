@@ -103,12 +103,14 @@ FUNCIONES_RANKING_POR_CATEGORIA: dict[str, Callable] = {
 #   float | None: el valor del campo convertido a float, o None si el campo
 #       no existe, es None, o no se puede convertir.
 def _valor_numerico(pelicula: dict, campo: str) -> float | None:
-    valor = pelicula.get(campo)
-    if valor is None:
-        return None
     try:
+        if not isinstance(pelicula, dict):
+            return None
+        valor = pelicula.get(campo)
+        if valor is None:
+            return None
         return float(valor)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, AttributeError):
         return None
 
 
@@ -119,8 +121,11 @@ def _valor_numerico(pelicula: dict, campo: str) -> float | None:
 #       las puntas. Misma normalizacion que usa busqueda.py (duplicada aca a
 #       proposito, en vez de importar el helper privado de otro modulo).
 def _normalizar(texto: str) -> str:
-    descompuesto = unicodedata.normalize("NFD", str(texto).strip().casefold())
-    return "".join(letra for letra in descompuesto if unicodedata.category(letra) != "Mn")
+    try:
+        descompuesto = unicodedata.normalize("NFD", str(texto).strip().casefold())
+        return "".join(letra for letra in descompuesto if unicodedata.category(letra) != "Mn")
+    except (TypeError, ValueError, AttributeError):
+        return ""
 
 
 # Parametros:
@@ -138,16 +143,19 @@ def _normalizar(texto: str) -> str:
 #       traduccion; para director/actor/idioma esto no encuentra nada (el
 #       diccionario es solo de generos) y no cambia el resultado.
 def _preferencia_coincide_con_valor(preferencia: str, valor_pelicula: str) -> bool:
-    preferencia_norm = _normalizar(preferencia)
-    if not preferencia_norm:
-        return False
-    if preferencia_norm in _normalizar(valor_pelicula):
-        return True
+    try:
+        preferencia_norm = _normalizar(preferencia)
+        if not preferencia_norm:
+            return False
+        if preferencia_norm in _normalizar(valor_pelicula):
+            return True
 
-    preferencia_traducida = busqueda.traducir_categoria_a_ingles(preferencia)
-    if preferencia_traducida is None:
+        preferencia_traducida = busqueda.traducir_categoria_a_ingles(preferencia)
+        if preferencia_traducida is None:
+            return False
+        return _normalizar(preferencia_traducida) in _normalizar(valor_pelicula)
+    except (TypeError, ValueError, AttributeError):
         return False
-    return _normalizar(preferencia_traducida) in _normalizar(valor_pelicula)
 
 
 # Parametros:
@@ -163,15 +171,23 @@ def _preferencia_coincide_con_valor(preferencia: str, valor_pelicula: str) -> bo
 #       minimo. Para "generos" e "idiomas" se devuelve directamente el
 #       promedio "crudo" de estadisticas.py (unica fuente disponible/util).
 def _promedio_por_categoria_combinado(catalogo: list[dict], clave_perfil: str, campo_puntuacion: str) -> dict[str, float]:
-    _, _, funcion_promedio_estadisticas = CAMPOS_PREFERENCIA[clave_perfil]
-    promedio_secundario = funcion_promedio_estadisticas(catalogo, campo_puntuacion)
+    try:
+        if clave_perfil not in CAMPOS_PREFERENCIA:
+            return {}
+        _, _, funcion_promedio_estadisticas = CAMPOS_PREFERENCIA[clave_perfil]
+        promedio_secundario = funcion_promedio_estadisticas(catalogo, campo_puntuacion)
+        if not isinstance(promedio_secundario, dict):
+            promedio_secundario = {}
 
-    funcion_ranking = FUNCIONES_RANKING_POR_CATEGORIA.get(clave_perfil)
-    if funcion_ranking is None:
-        return promedio_secundario
+        funcion_ranking = FUNCIONES_RANKING_POR_CATEGORIA.get(clave_perfil)
+        if funcion_ranking is None:
+            return promedio_secundario
 
-    promedio_primario = dict(funcion_ranking(catalogo, campo_puntuacion, MINIMO_PELICULAS_RANKING))
-    return {**promedio_secundario, **promedio_primario}
+        ranking_res = funcion_ranking(catalogo, campo_puntuacion, MINIMO_PELICULAS_RANKING)
+        promedio_primario = dict(ranking_res) if ranking_res else {}
+        return {**promedio_secundario, **promedio_primario}
+    except (TypeError, ValueError, KeyError, AttributeError):
+        return {}
 
 
 # Parametros:
@@ -191,13 +207,22 @@ def crear_perfil_usuario(
     actores_preferidos: list[str],
     idiomas_preferidos: list[str],
 ) -> dict:
-    return {
-        "nombre": nombre,
-        "generos": generos_preferidos,
-        "directores": directores_preferidos,
-        "actores": actores_preferidos,
-        "idiomas": idiomas_preferidos,
-    }
+    try:
+        return {
+            "nombre": nombre,
+            "generos": generos_preferidos if isinstance(generos_preferidos, list) else list(generos_preferidos or []),
+            "directores": directores_preferidos if isinstance(directores_preferidos, list) else list(directores_preferidos or []),
+            "actores": actores_preferidos if isinstance(actores_preferidos, list) else list(actores_preferidos or []),
+            "idiomas": idiomas_preferidos if isinstance(idiomas_preferidos, list) else list(idiomas_preferidos or []),
+        }
+    except (TypeError, ValueError, AttributeError):
+        return {
+            "nombre": nombre,
+            "generos": generos_preferidos,
+            "directores": directores_preferidos,
+            "actores": actores_preferidos,
+            "idiomas": idiomas_preferidos,
+        }
 
 
 # Parametros:
@@ -222,6 +247,9 @@ def cargar_perfiles(ruta_json: str = RUTA_PERFILES) -> list[dict]:
     except json.JSONDecodeError as e:
         print(f"Error: El archivo '{ruta_json}' está mal formado o corrupto ({e}).")
         return []
+    except (OSError, TypeError) as e:
+        print(f"Error al leer '{ruta_json}': {e}")
+        return []
 
 
 # Parametros:
@@ -235,7 +263,7 @@ def guardar_perfiles(perfiles: list[dict], ruta_json: str = RUTA_PERFILES) -> No
     try:
         with open(ruta_json, "w", encoding="utf-8") as archivo:
             json.dump(perfiles, archivo, ensure_ascii=False, indent=2)
-    except OSError as e:
+    except (OSError, TypeError, ValueError) as e:
         print(f"Error de E/S al intentar guardar en '{ruta_json}': {e}")
 
 
@@ -247,9 +275,15 @@ def guardar_perfiles(perfiles: list[dict], ruta_json: str = RUTA_PERFILES) -> No
 #       usuario sin ambiguedad (dos personas pueden llamarse igual); el id es
 #       lo que usan obtener_perfil_por_id/actualizar_perfil/eliminar_perfil.
 def _generar_id_usuario(perfiles: list[dict]) -> int:
-    if not perfiles:
+    try:
+        if not perfiles:
+            return 1
+        ids = [perfil["id"] for perfil in perfiles if isinstance(perfil, dict) and "id" in perfil]
+        if not ids:
+            return 1
+        return max(ids) + 1
+    except (TypeError, ValueError, KeyError, AttributeError):
         return 1
-    return max(perfil["id"] for perfil in perfiles) + 1
 
 
 # Parametros:
@@ -258,10 +292,15 @@ def _generar_id_usuario(perfiles: list[dict]) -> int:
 # Retorna:
 #   dict | None: el perfil encontrado, o None si no existe ese id.
 def obtener_perfil_por_id(perfiles: list[dict], id_usuario: int) -> dict | None:
-    for perfil in perfiles:
-        if perfil.get("id") == id_usuario:
-            return perfil
-    return None
+    try:
+        if not isinstance(perfiles, list):
+            return None
+        for perfil in perfiles:
+            if isinstance(perfil, dict) and perfil.get("id") == id_usuario:
+                return perfil
+        return None
+    except (TypeError, ValueError, AttributeError):
+        return None
 
 
 # Parametros:
@@ -283,12 +322,18 @@ def agregar_perfil(
     actores_preferidos: list[str],
     idiomas_preferidos: list[str],
 ) -> list[dict]:
-    nuevo_perfil = crear_perfil_usuario(
-        nombre, generos_preferidos, directores_preferidos, actores_preferidos, idiomas_preferidos
-    )
-    nuevo_perfil["id"] = _generar_id_usuario(perfiles)
-    perfiles.append(nuevo_perfil)
-    return perfiles
+    try:
+        if not isinstance(perfiles, list):
+            perfiles = []
+        nuevo_perfil = crear_perfil_usuario(
+            nombre, generos_preferidos, directores_preferidos, actores_preferidos, idiomas_preferidos
+        )
+        nuevo_perfil["id"] = _generar_id_usuario(perfiles)
+        perfiles.append(nuevo_perfil)
+        return perfiles
+    except Exception as e:
+        print(f"Error al agregar perfil: {e}")
+        return perfiles if isinstance(perfiles, list) else []
 
 
 # Parametros:
@@ -301,14 +346,20 @@ def agregar_perfil(
 # Manejo de errores esperado:
 #   ValueError si no existe un perfil con ese id.
 def actualizar_perfil(perfiles: list[dict], id_usuario: int, campos_actualizados: dict) -> list[dict]:
-    perfil = obtener_perfil_por_id(perfiles, id_usuario)
-    if perfil is None:
-        raise ValueError(f"No existe ningun perfil con el id {id_usuario}.")
+    try:
+        perfil = obtener_perfil_por_id(perfiles, id_usuario)
+        if perfil is None:
+            raise ValueError(f"No existe ningun perfil con el id {id_usuario}.")
 
-    for clave, valor in campos_actualizados.items():
-        perfil[clave] = valor
+        if isinstance(campos_actualizados, dict):
+            for clave, valor in campos_actualizados.items():
+                perfil[clave] = valor
 
-    return perfiles
+        return perfiles
+    except ValueError:
+        raise
+    except (TypeError, AttributeError) as e:
+        raise ValueError(f"Error al actualizar el perfil: {e}")
 
 
 # Parametros:
@@ -319,12 +370,17 @@ def actualizar_perfil(perfiles: list[dict], id_usuario: int, campos_actualizados
 # Manejo de errores esperado:
 #   ValueError si no existe un perfil con ese id.
 def eliminar_perfil(perfiles: list[dict], id_usuario: int) -> list[dict]:
-    perfil = obtener_perfil_por_id(perfiles, id_usuario)
-    if perfil is None:
-        raise ValueError(f"No existe ningun perfil con el id {id_usuario}.")
+    try:
+        perfil = obtener_perfil_por_id(perfiles, id_usuario)
+        if perfil is None:
+            raise ValueError(f"No existe ningun perfil con el id {id_usuario}.")
 
-    perfiles.remove(perfil)
-    return perfiles
+        perfiles.remove(perfil)
+        return perfiles
+    except ValueError:
+        raise
+    except (TypeError, AttributeError) as e:
+        raise ValueError(f"Error al eliminar el perfil: {e}")
 
 
 # Parametros:
@@ -336,14 +392,26 @@ def eliminar_perfil(perfiles: list[dict], id_usuario: int) -> list[dict]:
 #       el matching en busqueda.py (union de resultados por cada preferencia)
 #       en vez de reimplementar la comparacion de texto.
 def filtrar_peliculas_por_gustos(catalogo: list[dict], perfil_usuario: dict) -> list[dict]:
-    coincidencias: dict[int, dict] = {}
+    try:
+        if not isinstance(catalogo, list) or not isinstance(perfil_usuario, dict):
+            return []
 
-    for clave_perfil, (_, funcion_busqueda, _) in CAMPOS_PREFERENCIA.items():
-        for valor_preferido in perfil_usuario.get(clave_perfil) or []:
-            for pelicula in funcion_busqueda(catalogo, valor_preferido):
-                coincidencias[pelicula["id"]] = pelicula
+        coincidencias: dict[int, dict] = {}
 
-    return list(coincidencias.values())
+        for clave_perfil, (_, funcion_busqueda, _) in CAMPOS_PREFERENCIA.items():
+            for valor_preferido in perfil_usuario.get(clave_perfil) or []:
+                try:
+                    resultados = funcion_busqueda(catalogo, valor_preferido)
+                    if resultados:
+                        for pelicula in resultados:
+                            if isinstance(pelicula, dict) and "id" in pelicula:
+                                coincidencias[pelicula["id"]] = pelicula
+                except Exception:
+                    continue
+
+        return list(coincidencias.values())
+    except (TypeError, ValueError, AttributeError):
+        return []
 
 
 # Parametros:
@@ -355,16 +423,24 @@ def filtrar_peliculas_por_gustos(catalogo: list[dict], perfil_usuario: dict) -> 
 #       comparacion es normalizada (sin importar mayusculas ni tildes), igual
 #       que busqueda.py, para ser consistente con filtrar_peliculas_por_gustos.
 def calcular_afinidad(pelicula: dict, perfil_usuario: dict) -> int:
-    afinidad = 0
-    for clave_perfil, (campo_pelicula, _, _) in CAMPOS_PREFERENCIA.items():
-        valores_pelicula = pelicula.get(campo_pelicula) or []
-        preferencias = perfil_usuario.get(clave_perfil) or []
-        afinidad += sum(
-            1
-            for preferencia in preferencias
-            if any(_preferencia_coincide_con_valor(preferencia, valor) for valor in valores_pelicula)
-        )
-    return afinidad
+    try:
+        if not isinstance(pelicula, dict) or not isinstance(perfil_usuario, dict):
+            return 0
+
+        afinidad = 0
+        for clave_perfil, (campo_pelicula, _, _) in CAMPOS_PREFERENCIA.items():
+            valores_pelicula = pelicula.get(campo_pelicula) or []
+            preferencias = perfil_usuario.get(clave_perfil) or []
+            if not isinstance(valores_pelicula, (list, tuple, set)) or not isinstance(preferencias, (list, tuple, set)):
+                continue
+            afinidad += sum(
+                1
+                for preferencia in preferencias
+                if any(_preferencia_coincide_con_valor(preferencia, valor) for valor in valores_pelicula)
+            )
+        return afinidad
+    except (TypeError, ValueError, AttributeError):
+        return 0
 
 
 # Parametros:
@@ -385,39 +461,45 @@ def calcular_afinidad(pelicula: dict, perfil_usuario: dict) -> int:
 #       Si una pelicula no tiene categorias coincidentes con promedio
 #       historico disponible, se usa solo su puntaje propio.
 def recomendar_por_ranking(catalogo: list[dict], perfil_usuario: dict, campo_puntuacion: str, cantidad: int) -> list[dict]:
-    candidatas = filtrar_peliculas_por_gustos(catalogo, perfil_usuario)
-    if not candidatas:
+    try:
+        candidatas = filtrar_peliculas_por_gustos(catalogo, perfil_usuario)
+        if not candidatas:
+            return []
+
+        # se calcula una sola vez por categoria (no por pelicula): recorrer todo
+        # el catalogo dentro del ordenamiento seria muy costoso con miles de peliculas
+        promedios_por_categoria = {
+            clave_perfil: _promedio_por_categoria_combinado(catalogo, clave_perfil, campo_puntuacion)
+            for clave_perfil in CAMPOS_PREFERENCIA
+        }
+
+        def _puntaje_compuesto(pelicula: dict) -> float:
+            try:
+                puntaje_propio = _valor_numerico(pelicula, campo_puntuacion) or 0.0
+
+                valores_historicos = []
+                for clave_perfil, (campo_pelicula, _, _) in CAMPOS_PREFERENCIA.items():
+                    preferencias = perfil_usuario.get(clave_perfil) or []
+                    promedios = promedios_por_categoria.get(clave_perfil, {})
+                    for valor in pelicula.get(campo_pelicula) or []:
+                        if valor in promedios and any(
+                            _preferencia_coincide_con_valor(preferencia, valor) for preferencia in preferencias
+                        ):
+                            valores_historicos.append(promedios[valor])
+
+                if valores_historicos:
+                    promedio_historico = sum(valores_historicos) / len(valores_historicos)
+                    base = (puntaje_propio + promedio_historico) / 2
+                else:
+                    base = puntaje_propio
+
+                return base + PESO_AFINIDAD * calcular_afinidad(pelicula, perfil_usuario)
+            except Exception:
+                return 0.0
+
+        return sorted(candidatas, key=_puntaje_compuesto, reverse=True)[: max(0, cantidad)]
+    except (TypeError, ValueError, AttributeError):
         return []
-
-    # se calcula una sola vez por categoria (no por pelicula): recorrer todo
-    # el catalogo dentro del ordenamiento seria muy costoso con miles de peliculas
-    promedios_por_categoria = {
-        clave_perfil: _promedio_por_categoria_combinado(catalogo, clave_perfil, campo_puntuacion)
-        for clave_perfil in CAMPOS_PREFERENCIA
-    }
-
-    def _puntaje_compuesto(pelicula: dict) -> float:
-        puntaje_propio = _valor_numerico(pelicula, campo_puntuacion) or 0.0
-
-        valores_historicos = []
-        for clave_perfil, (campo_pelicula, _, _) in CAMPOS_PREFERENCIA.items():
-            preferencias = perfil_usuario.get(clave_perfil) or []
-            promedios = promedios_por_categoria[clave_perfil]
-            for valor in pelicula.get(campo_pelicula) or []:
-                if valor in promedios and any(
-                    _preferencia_coincide_con_valor(preferencia, valor) for preferencia in preferencias
-                ):
-                    valores_historicos.append(promedios[valor])
-
-        if valores_historicos:
-            promedio_historico = sum(valores_historicos) / len(valores_historicos)
-            base = (puntaje_propio + promedio_historico) / 2
-        else:
-            base = puntaje_propio
-
-        return base + PESO_AFINIDAD * calcular_afinidad(pelicula, perfil_usuario)
-
-    return sorted(candidatas, key=_puntaje_compuesto, reverse=True)[:cantidad]
 
 
 # Parametros:
@@ -428,5 +510,11 @@ def recomendar_por_ranking(catalogo: list[dict], perfil_usuario: dict, campo_pun
 #   list[dict]: hasta `cantidad` peliculas afines al perfil, elegidas al azar
 #       (sin repetir) entre las coincidencias.
 def recomendar_al_azar(catalogo: list[dict], perfil_usuario: dict, cantidad: int) -> list[dict]:
-    candidatas = filtrar_peliculas_por_gustos(catalogo, perfil_usuario)
-    return random.sample(candidatas, k=min(cantidad, len(candidatas)))
+    try:
+        candidatas = filtrar_peliculas_por_gustos(catalogo, perfil_usuario)
+        if not candidatas:
+            return []
+        cantidad_valida = max(0, cantidad)
+        return random.sample(candidatas, k=min(cantidad_valida, len(candidatas)))
+    except (TypeError, ValueError, AttributeError):
+        return []
