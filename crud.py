@@ -26,6 +26,20 @@ Cada "pelicula" es un dict con (entre otras) las claves:
 4. Función `obtener_id_por_titulo`: Permite recuperar el ID de una película a partir 
    de su título (case-insensitive) para facilitar la usabilidad en el menú.
 
+NUEVAS REGLAS DE DISEÑO:
+1. Separación de responsabilidades:
+   - `actualizar_pelicula` maneja únicamente campos simples (crea/sobrescribe como valor simple).
+   - `agregar_valor_a_lista` maneja únicamente listas (si el campo no existe en la película, la crea).
+2. Detección Dinámica de Listas:
+   No depende de estructuras rígidas en memoria. Si un campo es de tipo lista en el JSON,
+   se detecta dinámicamente mediante inspección del catálogo en RAM (`isinstance(..., list)`).
+3. Módulo Autónomo e Independiente:
+   Cero llamadas a `input()`. Los errores de entrada lanzan excepciones `ValueError` limpias.
+4. Compatibilidad Polimórfica:
+   Acepta los parámetros tanto en el orden de firmas estándar como con el catálogo enviado en la
+   primera posición desde `main.py`.  
+5. Toma la ruta del archivo JSON como parámetro opcional, con valor por defecto centralizado en `env.py`.   
+
 Funciones que contiene:
 - cargar_catalogo
 - guardar_catalogo
@@ -39,19 +53,7 @@ Funciones que contiene:
 """
 
 import json
-
 from env import RUTA_DATOS
-
-_CAMPOS_LISTA_VALIDOS = {
-    "genres",
-    "production_companies",
-    "production_countries",
-    "spoken_languages",
-    "cast",
-    "directors",
-    "keywords",
-}
-
 
 # Parámetros:
 #   ruta_json (str): ruta al archivo JSON con el catálogo de películas.
@@ -130,6 +132,9 @@ def obtener_id_por_titulo(titulo: str, ruta_json: str = RUTA_DATOS) -> int | Non
 # Manejo de errores esperado:
 #   ValueError si no incluye campos obligatorios o si ya existe una película con el mismo "id".
 def crear_pelicula(nueva_pelicula: dict, ruta_json: str = RUTA_DATOS) -> list[dict]:
+    if not isinstance(nueva_pelicula, dict):
+        raise ValueError("El parámetro de la nueva película debe ser un diccionario.")
+
     try:
         id_nueva = nueva_pelicula["id"]
         _ = nueva_pelicula["title"]
@@ -156,17 +161,51 @@ def crear_pelicula(nueva_pelicula: dict, ruta_json: str = RUTA_DATOS) -> list[di
 # Manejo de errores esperado:
 #   ValueError si no existe una película con ese id.
 def actualizar_pelicula(
-    id_pelicula: int, campos_actualizados: dict, ruta_json: str = RUTA_DATOS
+    id_pelicula: int, campo_o_dict, nuevo_valor=None, ruta_json: str = RUTA_DATOS
 ) -> list[dict]:
     catalogo = cargar_catalogo(ruta_json)
+
+    # 1. Buscar la película
     try:
         pelicula = next(p for p in catalogo if p.get("id") == id_pelicula)
     except StopIteration:
         raise ValueError(f"No existe ninguna película con el id {id_pelicula}.")
 
-    pelicula.update(campos_actualizados)
+    # 2. Desempaquetar clave y valor recibido
+    if isinstance(campo_o_dict, dict):
+        campo_nombre = next(iter(campo_o_dict.keys()))
+        valor_a_guardar = campo_o_dict[campo_nombre]
+    else:
+        campo_nombre = str(campo_o_dict)
+        valor_a_guardar = nuevo_valor
+
+    campo_lower = campo_nombre.strip().lower()
+
+    if not campo_lower:
+        raise ValueError("El nombre del campo no puede estar vacío.")
+
+    if valor_a_guardar is None or (isinstance(valor_a_guardar, str) and not valor_a_guardar.strip()):
+        raise ValueError("El valor a guardar no puede estar vacío.")
+
+    # 3. Normalizar clave existente ignorando mayúsculas/minúsculas
+    clave_existente = next((k for k in pelicula.keys() if k.lower() == campo_lower), campo_lower)
+
+    # 4. DETECCIÓN DINÁMICA: Revisa si es una lista en esta película o en cualquier otra del JSON
+    es_campo_lista = isinstance(pelicula.get(clave_existente), list) or any(
+        isinstance(p.get(clave_existente), list) for p in catalogo if clave_existente in p
+    )
+
+    if es_campo_lista:
+        raise ValueError(
+            f"El campo '{clave_existente}' es de tipo LISTA.\n"
+            f"Para agregar o quitar elementos de esta lista, utilice las opciones 6 o 7 del menú."
+        )
+
+    # 5. Guardar/crear como campo simple
+    pelicula[clave_existente] = valor_a_guardar
     guardar_catalogo(catalogo, ruta_json)
     return cargar_catalogo(ruta_json)
+
 
 # Parámetros:
 #   id_pelicula (int): id de la película a eliminar.
@@ -198,19 +237,52 @@ def eliminar_pelicula(id_pelicula: int, ruta_json: str = RUTA_DATOS) -> list[dic
 # Manejo de errores esperado:
 #   ValueError si no existe la película o si campo_lista no es un campo de tipo lista.
 def agregar_valor_a_lista(
-    id_pelicula: int, campo_lista: str, valor: str, ruta_json: str = RUTA_DATOS
+    catalogo_o_id, campo_o_id=None, valor_o_campo=None, ruta_o_valor=RUTA_DATOS
 ) -> list[dict]:
-    if campo_lista not in _CAMPOS_LISTA_VALIDOS:
-        raise ValueError(f"El campo '{campo_lista}' no es un campo válido de tipo lista.")
+    # Desempaquetado flexible de parámetros
+    if isinstance(catalogo_o_id, list):
+        catalogo = catalogo_o_id
+        id_pelicula = campo_o_id
+        campo_lista = valor_o_campo
+        valor = ruta_o_valor
+        ruta_json = RUTA_DATOS
+    else:
+        id_pelicula = catalogo_o_id
+        campo_lista = campo_o_id
+        valor = valor_o_campo
+        ruta_json = ruta_o_valor if isinstance(ruta_o_valor, str) and ruta_o_valor != RUTA_DATOS else RUTA_DATOS
+        catalogo = cargar_catalogo(ruta_json)
 
-    catalogo = cargar_catalogo(ruta_json)
     try:
-        pelicula = next(p for p in catalogo if p.get("id") == id_pelicula)
-        pelicula[campo_lista].append(valor)
+        pelicula = next(p for p in catalogo if p.get("id") == int(id_pelicula))
     except StopIteration:
         raise ValueError(f"No existe ninguna película con el id {id_pelicula}.")
-    except (KeyError, AttributeError):
-        raise ValueError(f"El campo '{campo_lista}' no existe o no es una lista válida en la película.")
+    except (ValueError, TypeError):
+        raise ValueError(f"El id '{id_pelicula}' no es un número entero válido.")
+
+    campo_lower = str(campo_lista).strip().lower()
+
+    if not campo_lower:
+        raise ValueError("El nombre del campo no puede estar vacío.")
+
+    if valor is None or not str(valor).strip():
+        raise ValueError("El valor a agregar a la lista no puede estar vacío.")
+
+    valor_limpio = str(valor).strip()
+    clave_existente = next((k for k in pelicula.keys() if k.lower() == campo_lower), campo_lower)
+
+    # DETECCIÓN Y CREACIÓN DINÁMICA:
+    if clave_existente not in pelicula:
+        # Si la lista no existe en la película, la inicializamos directamente
+        pelicula[clave_existente] = [valor_limpio]
+    else:
+        # Si ya existe el campo en la película, verificamos que sea de tipo lista
+        if not isinstance(pelicula[clave_existente], list):
+            raise ValueError(
+                f"El campo '{clave_existente}' existe pero es un campo SIMPLE, no una lista.\n"
+                f"Para modificarlo use la Opción 4 del menú."
+            )
+        pelicula[clave_existente].append(valor_limpio)
 
     guardar_catalogo(catalogo, ruta_json)
     return cargar_catalogo(ruta_json)
@@ -227,21 +299,47 @@ def agregar_valor_a_lista(
 #   ValueError si no existe la película, si campo_lista no es una lista, o si
 #   el valor no estaba presente en la lista.
 def quitar_valor_de_lista(
-    id_pelicula: int, campo_lista: str, valor: str, ruta_json: str = RUTA_DATOS
+    catalogo_o_id, campo_o_id=None, valor_o_campo=None, ruta_o_valor=RUTA_DATOS
 ) -> list[dict]:
-    if campo_lista not in _CAMPOS_LISTA_VALIDOS:
-        raise ValueError(f"El campo '{campo_lista}' no es un campo válido de tipo lista.")
+    if isinstance(catalogo_o_id, list):
+        catalogo = catalogo_o_id
+        id_pelicula = campo_o_id
+        campo_lista = valor_o_campo
+        valor = ruta_o_valor
+        ruta_json = RUTA_DATOS
+    else:
+        id_pelicula = catalogo_o_id
+        campo_lista = campo_o_id
+        valor = valor_o_campo
+        ruta_json = ruta_o_valor if isinstance(ruta_o_valor, str) and ruta_o_valor != RUTA_DATOS else RUTA_DATOS
+        catalogo = cargar_catalogo(ruta_json)
 
-    catalogo = cargar_catalogo(ruta_json)
     try:
-        pelicula = next(p for p in catalogo if p.get("id") == id_pelicula)
-        pelicula[campo_lista].remove(valor)
+        pelicula = next(p for p in catalogo if p.get("id") == int(id_pelicula))
     except StopIteration:
         raise ValueError(f"No existe ninguna película con el id {id_pelicula}.")
-    except (KeyError, AttributeError):
-        raise ValueError(f"El campo '{campo_lista}' no es una lista válida en la película.")
-    except ValueError:
-        raise ValueError(f"El valor '{valor}' no está presente en la lista de '{campo_lista}'.")
+    except (ValueError, TypeError):
+        raise ValueError(f"El id '{id_pelicula}' no es un número entero válido.")
+
+    campo_lower = str(campo_lista).strip().lower()
+
+    if not campo_lower:
+        raise ValueError("El nombre del campo no puede estar vacío.")
+
+    clave_existente = next((k for k in pelicula.keys() if k.lower() == campo_lower), None)
+
+    if not clave_existente or clave_existente not in pelicula:
+        raise ValueError(f"La película con ID {id_pelicula} no tiene el campo '{campo_lower}'.")
+
+    if not isinstance(pelicula[clave_existente], list):
+        raise ValueError(f"El campo '{clave_existente}' no es de tipo lista.")
+
+    valor_limpio = str(valor).strip()
+
+    if valor_limpio not in pelicula[clave_existente]:
+        raise ValueError(f"El valor '{valor_limpio}' no se encuentra en la lista '{clave_existente}'.")
+
+    pelicula[clave_existente].remove(valor_limpio)
 
     guardar_catalogo(catalogo, ruta_json)
     return cargar_catalogo(ruta_json)
