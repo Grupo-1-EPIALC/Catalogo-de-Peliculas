@@ -339,3 +339,35 @@ class TestMenuBusquedaFuncional:
         salida = capsys.readouterr().out
         assert "- Toy Story (1995) [id: 1]" in salida
         assert "- Toy Story 2 (1999) [id: 2]" in salida
+
+
+class TestMenuRecomendacionesFuncional:
+    """menu_recomendaciones end-to-end: la opcion 'Recomendacion por ranking'
+    reutiliza _pedir_campo_puntuacion_ranking (el mismo menu numerico de
+    Rankings) en vez de pedir el campo como texto libre."""
+
+    @pytest.fixture
+    def ruta_perfiles_temporal(self, monkeypatch, tmp_path) -> str:
+        ruta = str(tmp_path / "perfiles_test.json")
+        monkeypatch.setattr(main, "RUTA_PERFILES", ruta)
+        return ruta
+
+    def test_recomendacion_por_ranking_pide_el_campo_con_un_menu_numerico(
+        self, catalogo_prueba, ruta_perfiles_temporal, monkeypatch, capsys
+    ):
+        respuestas = iter(["1", "Andres", "", "", "", "", "7", "2", "5", "0"])
+        monkeypatch.setattr(builtins, "input", lambda _: next(respuestas))
+
+        llamada = {}
+
+        def recomendar_por_ranking_fake(catalogo, perfil, campo, cantidad):
+            llamada.update(campo=campo, cantidad=cantidad)
+            return []
+
+        monkeypatch.setattr(main.recomendaciones, "recomendar_por_ranking", recomendar_por_ranking_fake)
+
+        main.menu_recomendaciones(catalogo_prueba)
+
+        salida = capsys.readouterr().out
+        assert "Seleccione el campo de puntuacion:" in salida
+        assert llamada == {"campo": "popularity", "cantidad": 5}

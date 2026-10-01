@@ -88,16 +88,18 @@ CAMPOS_PROMEDIO_COMBINADO: list[str] = [campo for campo in CAMPOS_NUMERICOS if c
 #       igual que un valor faltante (si no, arrastra la media/mediana/promedio
 #       normalizado hacia abajo sin representar nada real).
 def _valor_numerico(pelicula: dict, campo: str) -> float | None:
-    valor = pelicula.get(campo)
-    if valor is None:
-        return None
     try:
+        if not isinstance(pelicula, dict):
+            return None
+        valor = pelicula.get(campo)
+        if valor is None:
+            return None
         valor_numerico = float(valor)
-    except (TypeError, ValueError):
+        if valor_numerico == 0:
+            return None
+        return valor_numerico
+    except (TypeError, ValueError, AttributeError):
         return None
-    if valor_numerico == 0:
-        return None
-    return valor_numerico
 
 
 # Parametros:
@@ -106,10 +108,15 @@ def _valor_numerico(pelicula: dict, campo: str) -> float | None:
 #   int | None: anio de estreno extraido de "release_date" (formato
 #       "YYYY-MM-DD"), o None si la fecha falta o esta mal formada.
 def _anio_estreno(pelicula: dict) -> int | None:
-    fecha = pelicula.get("release_date")
-    if not isinstance(fecha, str) or len(fecha) < 4 or not fecha[:4].isdigit():
+    try:
+        if not isinstance(pelicula, dict):
+            return None
+        fecha = pelicula.get("release_date")
+        if not isinstance(fecha, str) or len(fecha) < 4 or not fecha[:4].isdigit():
+            return None
+        return int(fecha[:4])
+    except (TypeError, ValueError, AttributeError):
         return None
-    return int(fecha[:4])
 
 
 # Parametros:
@@ -119,10 +126,15 @@ def _anio_estreno(pelicula: dict) -> int | None:
 #       en `catalogo`, o None si ninguna pelicula tiene un "release_date"
 #       valido.
 def rango_de_anios(catalogo: list[dict]) -> tuple[int, int] | None:
-    anios = [anio for anio in (_anio_estreno(pelicula) for pelicula in catalogo) if anio is not None]
-    if not anios:
+    try:
+        if not catalogo:
+            return None
+        anios = [anio for anio in (_anio_estreno(pelicula) for pelicula in catalogo) if anio is not None]
+        if not anios:
+            return None
+        return min(anios), max(anios)
+    except (TypeError, ValueError, AttributeError):
         return None
-    return min(anios), max(anios)
 
 
 # Parametros:
@@ -134,10 +146,15 @@ def rango_de_anios(catalogo: list[dict]) -> tuple[int, int] | None:
 #       `catalogo` con valor valido (ignorando faltantes/no numericos),
 #       redondeado a 2 decimales. 0.0 si ninguna pelicula tiene valor valido.
 def promedio_general(catalogo: list[dict], campo_numerico: str) -> float:
-    valores = [v for v in (_valor_numerico(p, campo_numerico) for p in catalogo) if v is not None]
-    if not valores:
+    try:
+        if not catalogo:
+            return 0.0
+        valores = [v for v in (_valor_numerico(p, campo_numerico) for p in catalogo) if v is not None]
+        if not valores:
+            return 0.0
+        return round(sum(valores) / len(valores), 2)
+    except (TypeError, ValueError, AttributeError, ZeroDivisionError):
         return 0.0
-    return round(sum(valores) / len(valores), 2)
 
 
 # Parametros:
@@ -148,16 +165,21 @@ def promedio_general(catalogo: list[dict], campo_numerico: str) -> float:
 #       valor valido, redondeada a 2 decimales. Con cantidad par de valores,
 #       promedia los dos centrales. 0.0 si ninguna pelicula tiene valor valido.
 def mediana_general(catalogo: list[dict], campo_numerico: str) -> float:
-    valores = sorted(v for v in (_valor_numerico(p, campo_numerico) for p in catalogo) if v is not None)
-    if not valores:
+    try:
+        if not catalogo:
+            return 0.0
+        valores = sorted(v for v in (_valor_numerico(p, campo_numerico) for p in catalogo) if v is not None)
+        if not valores:
+            return 0.0
+        cantidad = len(valores)
+        medio = cantidad // 2
+        if cantidad % 2 == 1:
+            mediana = valores[medio]
+        else:
+            mediana = (valores[medio - 1] + valores[medio]) / 2
+        return round(mediana, 2)
+    except (TypeError, ValueError, AttributeError, IndexError, ZeroDivisionError):
         return 0.0
-    cantidad = len(valores)
-    medio = cantidad // 2
-    if cantidad % 2 == 1:
-        mediana = valores[medio]
-    else:
-        mediana = (valores[medio - 1] + valores[medio]) / 2
-    return round(mediana, 2)
 
 
 # Parametros:
@@ -168,10 +190,15 @@ def mediana_general(catalogo: list[dict], campo_numerico: str) -> float:
 #       ese campo en `catalogo`, o None si ninguna pelicula tiene un valor
 #       numerico valido.
 def _rango_numerico(catalogo: list[dict], campo_numerico: str) -> tuple[float, float] | None:
-    valores = [v for v in (_valor_numerico(p, campo_numerico) for p in catalogo) if v is not None]
-    if not valores:
+    try:
+        if not catalogo:
+            return None
+        valores = [v for v in (_valor_numerico(p, campo_numerico) for p in catalogo) if v is not None]
+        if not valores:
+            return None
+        return min(valores), max(valores)
+    except (TypeError, ValueError, AttributeError):
         return None
-    return min(valores), max(valores)
 
 
 # Parametros:
@@ -184,9 +211,15 @@ def _rango_numerico(catalogo: list[dict], campo_numerico: str) -> tuple[float, f
 #       hay variacion que reescalar), devuelve 5.5 (el punto medio de la
 #       escala) en vez de forzar un extremo.
 def _normalizar_a_escala(valor: float, minimo: float, maximo: float) -> float:
-    if maximo == minimo:
+    try:
+        valor_f = float(valor)
+        minimo_f = float(minimo)
+        maximo_f = float(maximo)
+        if maximo_f == minimo_f:
+            return 5.5
+        return round(1 + 9 * (valor_f - minimo_f) / (maximo_f - minimo_f), 2)
+    except (TypeError, ValueError, ZeroDivisionError):
         return 5.5
-    return round(1 + 9 * (valor - minimo) / (maximo - minimo), 2)
 
 
 # Parametros:
@@ -203,19 +236,24 @@ def _normalizar_a_escala(valor: float, minimo: float, maximo: float) -> float:
 #       *antes* de promediarlos. 0.0 si `catalogo_referencia` no tiene ningun
 #       valor valido para ese campo, o si `subconjunto` no tiene ninguno.
 def promedio_normalizado(catalogo_referencia: list[dict], subconjunto: list[dict], campo_numerico: str) -> float:
-    rango = _rango_numerico(catalogo_referencia, campo_numerico)
-    if rango is None:
-        return 0.0
-    minimo, maximo = rango
+    try:
+        if not subconjunto or not catalogo_referencia:
+            return 0.0
+        rango = _rango_numerico(catalogo_referencia, campo_numerico)
+        if rango is None:
+            return 0.0
+        minimo, maximo = rango
 
-    valores_normalizados = [
-        _normalizar_a_escala(valor, minimo, maximo)
-        for valor in (_valor_numerico(pelicula, campo_numerico) for pelicula in subconjunto)
-        if valor is not None
-    ]
-    if not valores_normalizados:
+        valores_normalizados = [
+            _normalizar_a_escala(valor, minimo, maximo)
+            for valor in (_valor_numerico(pelicula, campo_numerico) for pelicula in subconjunto)
+            if valor is not None
+        ]
+        if not valores_normalizados:
+            return 0.0
+        return round(sum(valores_normalizados) / len(valores_normalizados), 2)
+    except (TypeError, ValueError, AttributeError, ZeroDivisionError):
         return 0.0
-    return round(sum(valores_normalizados) / len(valores_normalizados), 2)
 
 
 # Parametros:
@@ -232,23 +270,34 @@ def promedio_normalizado(catalogo_referencia: list[dict], subconjunto: list[dict
 #         incluye "runtime", ver esa constante). 0.0 si esta vacia.
 #   }
 def resumen_de_campos(catalogo_referencia: list[dict], subconjunto: list[dict]) -> dict:
-    medias = {campo: promedio_general(subconjunto, campo) for campo in CAMPOS_NUMERICOS}
-    medianas = {campo: mediana_general(subconjunto, campo) for campo in CAMPOS_NUMERICOS}
-    normalizados = {
-        campo: promedio_normalizado(catalogo_referencia, subconjunto, campo) for campo in CAMPOS_PROMEDIO_COMBINADO
-    }
+    try:
+        subconjunto_valido = subconjunto if isinstance(subconjunto, list) else []
+        catalogo_valido = catalogo_referencia if isinstance(catalogo_referencia, list) else []
 
-    if normalizados:
-        promedio_combinado = round(sum(normalizados.values()) / len(normalizados), 2)
-    else:
-        promedio_combinado = 0.0
+        medias = {campo: promedio_general(subconjunto_valido, campo) for campo in CAMPOS_NUMERICOS}
+        medianas = {campo: mediana_general(subconjunto_valido, campo) for campo in CAMPOS_NUMERICOS}
+        normalizados = {
+            campo: promedio_normalizado(catalogo_valido, subconjunto_valido, campo) for campo in CAMPOS_PROMEDIO_COMBINADO
+        }
 
-    return {
-        "cantidad_peliculas": len(subconjunto),
-        "medias": medias,
-        "medianas": medianas,
-        "promedio_normalizado_combinado": promedio_combinado,
-    }
+        if normalizados:
+            promedio_combinado = round(sum(normalizados.values()) / len(normalizados), 2)
+        else:
+            promedio_combinado = 0.0
+
+        return {
+            "cantidad_peliculas": len(subconjunto_valido),
+            "medias": medias,
+            "medianas": medianas,
+            "promedio_normalizado_combinado": promedio_combinado,
+        }
+    except (TypeError, ValueError, AttributeError):
+        return {
+            "cantidad_peliculas": len(subconjunto) if isinstance(subconjunto, list) else 0,
+            "medias": {campo: 0.0 for campo in CAMPOS_NUMERICOS},
+            "medianas": {campo: 0.0 for campo in CAMPOS_NUMERICOS},
+            "promedio_normalizado_combinado": 0.0,
+        }
 
 
 # Parametros:
@@ -262,18 +311,30 @@ def resumen_de_campos(catalogo_referencia: list[dict], subconjunto: list[dict]) 
 #       numerico valido en campo_numerico. Una pelicula con varios valores en
 #       campo_lista (ej. varios generos) suma a cada uno de ellos.
 def _promedio_por_categoria(catalogo: list[dict], campo_lista: str, campo_numerico: str) -> dict[str, float]:
-    sumas: dict[str, float] = {}
-    cantidades: dict[str, int] = {}
+    try:
+        if not catalogo:
+            return {}
+        sumas: dict[str, float] = {}
+        cantidades: dict[str, int] = {}
 
-    for pelicula in catalogo:
-        valor = _valor_numerico(pelicula, campo_numerico)
-        if valor is None:
-            continue
-        for categoria in pelicula.get(campo_lista) or []:
-            sumas[categoria] = sumas.get(categoria, 0.0) + valor
-            cantidades[categoria] = cantidades.get(categoria, 0) + 1
+        for pelicula in catalogo:
+            if not isinstance(pelicula, dict):
+                continue
+            valor = _valor_numerico(pelicula, campo_numerico)
+            if valor is None:
+                continue
+            categorias = pelicula.get(campo_lista)
+            if not isinstance(categorias, (list, tuple, set)):
+                continue
+            for categoria in categorias:
+                if not isinstance(categoria, str):
+                    continue
+                sumas[categoria] = sumas.get(categoria, 0.0) + valor
+                cantidades[categoria] = cantidades.get(categoria, 0) + 1
 
-    return {categoria: round(sumas[categoria] / cantidades[categoria], 2) for categoria in sumas}
+        return {categoria: round(sumas[categoria] / cantidades[categoria], 2) for categoria in sumas}
+    except (TypeError, ValueError, AttributeError, ZeroDivisionError):
+        return {}
 
 
 # Parametros:
@@ -283,18 +344,25 @@ def _promedio_por_categoria(catalogo: list[dict], campo_lista: str, campo_numeri
 #   dict[int, float]: {anio: promedio} para cada anio de estreno presente,
 #       considerando solo peliculas con anio y valor numerico validos.
 def _promedio_por_anio(catalogo: list[dict], campo_numerico: str) -> dict[int, float]:
-    sumas: dict[int, float] = {}
-    cantidades: dict[int, int] = {}
+    try:
+        if not catalogo:
+            return {}
+        sumas: dict[int, float] = {}
+        cantidades: dict[int, int] = {}
 
-    for pelicula in catalogo:
-        valor = _valor_numerico(pelicula, campo_numerico)
-        anio = _anio_estreno(pelicula)
-        if valor is None or anio is None:
-            continue
-        sumas[anio] = sumas.get(anio, 0.0) + valor
-        cantidades[anio] = cantidades.get(anio, 0) + 1
+        for pelicula in catalogo:
+            if not isinstance(pelicula, dict):
+                continue
+            valor = _valor_numerico(pelicula, campo_numerico)
+            anio = _anio_estreno(pelicula)
+            if valor is None or anio is None:
+                continue
+            sumas[anio] = sumas.get(anio, 0.0) + valor
+            cantidades[anio] = cantidades.get(anio, 0) + 1
 
-    return {anio: round(sumas[anio] / cantidades[anio], 2) for anio in sumas}
+        return {anio: round(sumas[anio] / cantidades[anio], 2) for anio in sumas}
+    except (TypeError, ValueError, AttributeError, ZeroDivisionError):
+        return {}
 
 
 # Parametros:
@@ -303,7 +371,12 @@ def _promedio_por_anio(catalogo: list[dict], campo_numerico: str) -> dict[int, f
 #   list[tuple]: los 5 pares (categoria, promedio) con mayor promedio,
 #       ordenados de mayor a menor.
 def _top5(promedios: dict) -> list[tuple]:
-    return sorted(promedios.items(), key=lambda item: item[1], reverse=True)[:5]
+    try:
+        if not isinstance(promedios, dict):
+            return []
+        return sorted(promedios.items(), key=lambda item: item[1], reverse=True)[:5]
+    except (TypeError, ValueError, AttributeError):
+        return []
 
 
 # Parametros:
@@ -313,7 +386,10 @@ def _top5(promedios: dict) -> list[tuple]:
 #   dict[str, float]: diccionario {genero: promedio} con el promedio de
 #       campo_numerico para las peliculas de cada genero.
 def promedio_por_genero(catalogo: list[dict], campo_numerico: str) -> dict[str, float]:
-    return _promedio_por_categoria(catalogo, "genres", campo_numerico)
+    try:
+        return _promedio_por_categoria(catalogo, "genres", campo_numerico)
+    except (TypeError, ValueError, AttributeError):
+        return {}
 
 
 # Parametros:
@@ -323,7 +399,10 @@ def promedio_por_genero(catalogo: list[dict], campo_numerico: str) -> dict[str, 
 #   dict[str, float]: diccionario {director: promedio} con el promedio de
 #       campo_numerico para las peliculas de cada director.
 def promedio_por_director(catalogo: list[dict], campo_numerico: str) -> dict[str, float]:
-    return _promedio_por_categoria(catalogo, "directors", campo_numerico)
+    try:
+        return _promedio_por_categoria(catalogo, "directors", campo_numerico)
+    except (TypeError, ValueError, AttributeError):
+        return {}
 
 
 # Parametros:
@@ -333,7 +412,10 @@ def promedio_por_director(catalogo: list[dict], campo_numerico: str) -> dict[str
 #   dict[str, float]: diccionario {actor: promedio} con el promedio de
 #       campo_numerico para las peliculas de cada actor.
 def promedio_por_actor(catalogo: list[dict], campo_numerico: str) -> dict[str, float]:
-    return _promedio_por_categoria(catalogo, "cast", campo_numerico)
+    try:
+        return _promedio_por_categoria(catalogo, "cast", campo_numerico)
+    except (TypeError, ValueError, AttributeError):
+        return {}
 
 
 # Parametros:
@@ -343,7 +425,10 @@ def promedio_por_actor(catalogo: list[dict], campo_numerico: str) -> dict[str, f
 #   dict[str, float]: diccionario {pais: promedio} con el promedio de
 #       campo_numerico para las peliculas producidas en cada pais.
 def promedio_por_pais(catalogo: list[dict], campo_numerico: str) -> dict[str, float]:
-    return _promedio_por_categoria(catalogo, "production_countries", campo_numerico)
+    try:
+        return _promedio_por_categoria(catalogo, "production_countries", campo_numerico)
+    except (TypeError, ValueError, AttributeError):
+        return {}
 
 
 # Parametros:
@@ -353,7 +438,10 @@ def promedio_por_pais(catalogo: list[dict], campo_numerico: str) -> dict[str, fl
 #   dict[str, float]: diccionario {idioma: promedio} con el promedio de
 #       campo_numerico para las peliculas de cada idioma hablado.
 def promedio_por_idioma(catalogo: list[dict], campo_numerico: str) -> dict[str, float]:
-    return _promedio_por_categoria(catalogo, "spoken_languages", campo_numerico)
+    try:
+        return _promedio_por_categoria(catalogo, "spoken_languages", campo_numerico)
+    except (TypeError, ValueError, AttributeError):
+        return {}
 
 
 # Parametros:
@@ -363,7 +451,10 @@ def promedio_por_idioma(catalogo: list[dict], campo_numerico: str) -> dict[str, 
 #   list[tuple[str, float]]: los 5 generos con mayor "vote_average" promedio,
 #       ordenados de mayor a menor.
 def top5_generos(catalogo: list[dict]) -> list[tuple[str, float]]:
-    return _top5(promedio_por_genero(catalogo, "vote_average"))
+    try:
+        return _top5(promedio_por_genero(catalogo, "vote_average"))
+    except (TypeError, ValueError, AttributeError):
+        return []
 
 
 # Parametros:
@@ -372,7 +463,10 @@ def top5_generos(catalogo: list[dict]) -> list[tuple[str, float]]:
 #   list[tuple[str, float]]: los 5 directores con mayor "vote_average"
 #       promedio, ordenados de mayor a menor.
 def top5_directores(catalogo: list[dict]) -> list[tuple[str, float]]:
-    return _top5(promedio_por_director(catalogo, "vote_average"))
+    try:
+        return _top5(promedio_por_director(catalogo, "vote_average"))
+    except (TypeError, ValueError, AttributeError):
+        return []
 
 
 # Parametros:
@@ -381,7 +475,10 @@ def top5_directores(catalogo: list[dict]) -> list[tuple[str, float]]:
 #   list[tuple[str, float]]: los 5 actores con mayor "vote_average" promedio,
 #       ordenados de mayor a menor.
 def top5_actores(catalogo: list[dict]) -> list[tuple[str, float]]:
-    return _top5(promedio_por_actor(catalogo, "vote_average"))
+    try:
+        return _top5(promedio_por_actor(catalogo, "vote_average"))
+    except (TypeError, ValueError, AttributeError):
+        return []
 
 
 # Parametros:
@@ -390,7 +487,10 @@ def top5_actores(catalogo: list[dict]) -> list[tuple[str, float]]:
 #   list[tuple[str, float]]: los 5 paises con mayor "vote_average" promedio,
 #       ordenados de mayor a menor.
 def top5_paises(catalogo: list[dict]) -> list[tuple[str, float]]:
-    return _top5(promedio_por_pais(catalogo, "vote_average"))
+    try:
+        return _top5(promedio_por_pais(catalogo, "vote_average"))
+    except (TypeError, ValueError, AttributeError):
+        return []
 
 
 # Parametros:
@@ -399,7 +499,10 @@ def top5_paises(catalogo: list[dict]) -> list[tuple[str, float]]:
 #   list[tuple[str, float]]: los 5 idiomas con mayor "vote_average" promedio,
 #       ordenados de mayor a menor.
 def top5_idiomas(catalogo: list[dict]) -> list[tuple[str, float]]:
-    return _top5(promedio_por_idioma(catalogo, "vote_average"))
+    try:
+        return _top5(promedio_por_idioma(catalogo, "vote_average"))
+    except (TypeError, ValueError, AttributeError):
+        return []
 
 
 # Parametros:
@@ -408,4 +511,7 @@ def top5_idiomas(catalogo: list[dict]) -> list[tuple[str, float]]:
 #   list[tuple[int, float]]: los 5 anios de estreno con mayor "vote_average"
 #       promedio, ordenados de mayor a menor.
 def top5_anios(catalogo: list[dict]) -> list[tuple[int, float]]:
-    return _top5(_promedio_por_anio(catalogo, "vote_average"))
+    try:
+        return _top5(_promedio_por_anio(catalogo, "vote_average"))
+    except (TypeError, ValueError, AttributeError):
+        return []
