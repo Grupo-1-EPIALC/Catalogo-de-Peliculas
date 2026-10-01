@@ -17,9 +17,17 @@ Funciones que contiene:
 - menu_recomendaciones
 - main
 
+Cada submenu recibe un parametro `desde_menu_principal` (False por defecto):
+`main()` lo pasa en True, asi que al navegar desde el menu principal cada
+vuelta del submenu pausa ("Presione Enter para continuar...") antes de
+volver a mostrar el menu, para que un resultado no se pierda debajo del
+siguiente pantallazo. Los submenus llamados directamente (como hacen los
+tests) no pausan, porque no pasan ese parametro.
+
 Funciones auxiliares (entrada/salida por consola):
 - _pedir_entero
 - _pedir_lista
+- _pausar_si_corresponde
 - _mostrar_resultado
 - _mostrar_listado_peliculas
 - _mostrar_detalle_peliculas
@@ -135,6 +143,18 @@ def _pedir_entero(mensaje: str) -> int:
 def _pedir_lista(mensaje: str) -> list[str]:
     texto = input(mensaje)
     return [valor.strip() for valor in texto.split(",") if valor.strip()]
+
+
+# Parametros:
+#   desde_menu_principal (bool): bandera que cada submenu recibe de main().
+# Retorna:
+#   None. Si `desde_menu_principal` es True, espera a que el usuario presione
+#       Enter antes de volver a mostrar el menu (asi lo que se imprimio no
+#       queda tapado por el siguiente pantallazo). Si es False (default:
+#       submenu llamado directamente, como en los tests), no hace nada.
+def _pausar_si_corresponde(desde_menu_principal: bool) -> None:
+    if desde_menu_principal:
+        input("\nPresione Enter para continuar...")
 
 
 def _pedir_campo_puntuacion_ranking() -> str:
@@ -258,13 +278,14 @@ def mostrar_menu(opciones: dict[int, str]) -> None:
 
 # Parametros:
 #   catalogo (list[dict]): catalogo de peliculas ya cargado en memoria.
+#   desde_menu_principal (bool): ver _pausar_si_corresponde.
 # Retorna:
 #   None. Este submenu solo consulta datos (busqueda.py), no modifica el
 #       catalogo. La busqueda por titulo (opcion 1) muestra la ficha
 #       completa de cada resultado (suele haber pocos); el resto pide el
 #       listado compacto (resumen=True) porque puede haber muchas
 #       coincidencias (ej. un actor con decenas de peliculas).
-def menu_busqueda(catalogo: list[dict]) -> None:
+def menu_busqueda(catalogo: list[dict], desde_menu_principal: bool = False) -> None:
     while True:
         print("\n--- Busqueda ---")
         mostrar_menu(MENU_BUSQUEDA)
@@ -275,6 +296,7 @@ def menu_busqueda(catalogo: list[dict]) -> None:
         if opcion == 1:
             resultado = busqueda.buscar_por_titulo(catalogo, input("Titulo a buscar: "))
             _mostrar_detalle_peliculas(resultado)
+            _pausar_si_corresponde(desde_menu_principal)
             continue
         if opcion == 2:
             resultado = busqueda.buscar_por_actor(catalogo, input("Nombre del actor: "), resumen=True)
@@ -306,10 +328,12 @@ def menu_busqueda(catalogo: list[dict]) -> None:
             continue
 
         _mostrar_listado_peliculas(resultado)
+        _pausar_si_corresponde(desde_menu_principal)
 
 
 # Parametros:
 #   catalogo (list[dict]): catalogo de peliculas ya cargado en memoria.
+#   desde_menu_principal (bool): ver _pausar_si_corresponde.
 # Retorna:
 #   list[dict]: el catalogo actualizado tras aplicar las operaciones del CRUD.
 # Flujo:
@@ -320,7 +344,7 @@ def menu_busqueda(catalogo: list[dict]) -> None:
 #   `catalogo`, asi que hay que pasarle RUTA_DATOS explicitamente en cada
 #   llamada; si se omite, la operacion termina leyendo/escribiendo el
 #   archivo equivocado.
-def menu_crud(catalogo: list[dict]) -> list[dict]:
+def menu_crud(catalogo: list[dict], desde_menu_principal: bool = False) -> list[dict]:
     while True:
         print("\n--- CRUD de peliculas ---")
         mostrar_menu(MENU_CRUD)
@@ -332,11 +356,13 @@ def menu_crud(catalogo: list[dict]) -> list[dict]:
         if opcion == 1:
             titulo = input("Titulo de la pelicula a buscar: ")
             _mostrar_resultado(crud.obtener_id_por_titulo(titulo, RUTA_DATOS))
+            _pausar_si_corresponde(desde_menu_principal)
             continue
 
         if opcion == 2:
             id_pelicula = _pedir_entero("Id de la pelicula: ")
             _mostrar_resultado(crud.obtener_pelicula_por_id(id_pelicula, RUTA_DATOS))
+            _pausar_si_corresponde(desde_menu_principal)
             continue
 
         try:
@@ -377,14 +403,18 @@ def menu_crud(catalogo: list[dict]) -> list[dict]:
 
         except ValueError as error:
             print(f"No se pudo completar la operacion: {error}")
+            _pausar_si_corresponde(desde_menu_principal)
             continue
+
+        _pausar_si_corresponde(desde_menu_principal)
 
 
 # Parametros:
 #   catalogo (list[dict]): catalogo de peliculas ya cargado en memoria.
+#   desde_menu_principal (bool): ver _pausar_si_corresponde.
 # Retorna:
 #   None. Este submenu solo consulta datos (rankings.py).
-def menu_rankings(catalogo: list[dict]) -> None:
+def menu_rankings(catalogo: list[dict], desde_menu_principal: bool = False) -> None:
     while True:
         print("\n--- Rankings ---")
         mostrar_menu(MENU_RANKINGS)
@@ -427,6 +457,7 @@ def menu_rankings(catalogo: list[dict]) -> None:
             continue
 
         _mostrar_resultado(resultado)
+        _pausar_si_corresponde(desde_menu_principal)
 
 
 # Parametros:
@@ -465,6 +496,7 @@ def _mostrar_perfiles(perfiles: list[dict]) -> None:
 
 # Parametros:
 #   catalogo (list[dict]): catalogo de peliculas ya cargado en memoria.
+#   desde_menu_principal (bool): ver _pausar_si_corresponde.
 # Retorna:
 #   None. Este submenu solo consulta datos (busqueda.py + estadisticas.py),
 #       no modifica el catalogo. Las opciones 1 a 6 filtran el catalogo por
@@ -472,7 +504,7 @@ def _mostrar_perfiles(perfiles: list[dict]) -> None:
 #       castellano o ingles) y muestran sus estadisticas
 #       (estadisticas.resumen_de_campos); la opcion 7 hace lo mismo sobre el
 #       catalogo completo y ademas muestra el top 5 de cada categoria.
-def menu_estadisticas(catalogo: list[dict]) -> None:
+def menu_estadisticas(catalogo: list[dict], desde_menu_principal: bool = False) -> None:
     while True:
         print("\n--- Estadisticas ---")
         mostrar_menu(MENU_ESTADISTICAS)
@@ -523,6 +555,8 @@ def menu_estadisticas(catalogo: list[dict]) -> None:
             print("\nTop 5 anios (vote_average):")
             _mostrar_resultado(estadisticas.top5_anios(catalogo))
 
+        _pausar_si_corresponde(desde_menu_principal)
+
 
 # Campos de un perfil de usuario que se pueden editar con la opcion "Editar
 # perfil guardado" ("id" queda afuera: lo asigna agregar_perfil, no se edita).
@@ -531,6 +565,7 @@ _CAMPOS_PERFIL_EDITABLES = {"nombre", "generos", "directores", "actores", "idiom
 
 # Parametros:
 #   catalogo (list[dict]): catalogo de peliculas ya cargado en memoria.
+#   desde_menu_principal (bool): ver _pausar_si_corresponde.
 # Retorna:
 #   None. Los perfiles de usuario se cargan de RUTA_PERFILES al entrar al
 #       submenu y se persisten de inmediato con recomendaciones.guardar_perfiles
@@ -538,7 +573,7 @@ _CAMPOS_PERFIL_EDITABLES = {"nombre", "generos", "directores", "actores", "idiom
 #       catalogo). El "perfil activo" (con el que se piden recomendaciones)
 #       vive solo en memoria durante el submenu: se elige con "Crear perfil
 #       de usuario" o "Usar un perfil guardado".
-def menu_recomendaciones(catalogo: list[dict]) -> None:
+def menu_recomendaciones(catalogo: list[dict], desde_menu_principal: bool = False) -> None:
     perfiles = recomendaciones.cargar_perfiles(RUTA_PERFILES)
     perfil_usuario: dict | None = None
 
@@ -562,10 +597,12 @@ def menu_recomendaciones(catalogo: list[dict]) -> None:
             recomendaciones.guardar_perfiles(perfiles, RUTA_PERFILES)
             perfil_usuario = perfiles[-1]
             print(f"Perfil creado y guardado con id {perfil_usuario['id']}.")
+            _pausar_si_corresponde(desde_menu_principal)
             continue
 
         if opcion == 2:
             _mostrar_perfiles(perfiles)
+            _pausar_si_corresponde(desde_menu_principal)
             continue
 
         if opcion == 3:
@@ -576,6 +613,7 @@ def menu_recomendaciones(catalogo: list[dict]) -> None:
             else:
                 perfil_usuario = encontrado
                 print(f"Perfil activo: {perfil_usuario['nombre']} (id {perfil_usuario['id']}).")
+            _pausar_si_corresponde(desde_menu_principal)
             continue
 
         if opcion in (4, 5):
@@ -585,6 +623,7 @@ def menu_recomendaciones(catalogo: list[dict]) -> None:
                     campo = input("Campo a modificar (nombre, generos, directores, actores, idiomas): ")
                     if campo not in _CAMPOS_PERFIL_EDITABLES:
                         print(f"'{campo}' no es un campo editable de un perfil.")
+                        _pausar_si_corresponde(desde_menu_principal)
                         continue
                     nuevo_valor = input("Nuevo nombre: ") if campo == "nombre" else _pedir_lista(f"Nuevos {campo} (separados por coma): ")
                     perfiles = recomendaciones.actualizar_perfil(perfiles, id_usuario, {campo: nuevo_valor})
@@ -597,8 +636,10 @@ def menu_recomendaciones(catalogo: list[dict]) -> None:
                     print("Perfil eliminado.")
             except ValueError as error:
                 print(f"No se pudo completar la operacion: {error}")
+                _pausar_si_corresponde(desde_menu_principal)
                 continue
             recomendaciones.guardar_perfiles(perfiles, RUTA_PERFILES)
+            _pausar_si_corresponde(desde_menu_principal)
             continue
 
         if perfil_usuario is None:
@@ -619,6 +660,7 @@ def menu_recomendaciones(catalogo: list[dict]) -> None:
             continue
 
         _mostrar_resultado(resultado)
+        _pausar_si_corresponde(desde_menu_principal)
 
 
 # Parametros: ninguno.
@@ -644,21 +686,18 @@ def main() -> None:
         opcion = _pedir_entero("Opcion: ")
 
         if opcion == 0:
-            # MODIFICACION: Se quito 'crud.guardar_catalogo(catalogo, RUTA_DATOS)' de aqui
-            # porque los datos se guardan en tiempo real tras cada operacion en crud.py.
-            # Los demas modulos solo leen, no modifican el catalogo, asi que no necesitan persistir nada.
             print("Hasta la proxima.")
             break
         elif opcion == 1:
-            menu_busqueda(catalogo)
+            menu_busqueda(catalogo, desde_menu_principal=True)
         elif opcion == 2:
-            catalogo = menu_crud(catalogo)
+            catalogo = menu_crud(catalogo, desde_menu_principal=True)
         elif opcion == 3:
-            menu_rankings(catalogo)
+            menu_rankings(catalogo, desde_menu_principal=True)
         elif opcion == 4:
-            menu_estadisticas(catalogo)
+            menu_estadisticas(catalogo, desde_menu_principal=True)
         elif opcion == 5:
-            menu_recomendaciones(catalogo)
+            menu_recomendaciones(catalogo, desde_menu_principal=True)
         else:
             print("Opcion invalida.")
 
