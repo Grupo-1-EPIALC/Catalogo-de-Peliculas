@@ -608,7 +608,7 @@ def menu_recomendaciones(catalogo: list[dict]) -> None:
         if opcion == 6:
             resultado = recomendaciones.filtrar_peliculas_por_gustos(catalogo, perfil_usuario)
         elif opcion == 7:
-            campo = input("Campo de puntuacion (vote_average, popularity): ")
+            campo = _pedir_campo_puntuacion_ranking()
             cantidad = _pedir_entero("Cantidad de recomendaciones: ")
             resultado = recomendaciones.recomendar_por_ranking(catalogo, perfil_usuario, campo, cantidad)
         elif opcion == 8:
