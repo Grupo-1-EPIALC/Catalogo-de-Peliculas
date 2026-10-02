@@ -13,7 +13,7 @@ Variables que contiene:
 """
 
 # Catalogo unificado generado por `eda dataset.ipynb`.
-RUTA_DATOS = "data/movies_sample_representativa.json"
+RUTA_DATOS = "data/datos.json"
 
 # Perfiles de usuario de recomendaciones.py (ver el docstring de ese modulo).
 RUTA_PERFILES = "data/perfiles_usuario.json"
