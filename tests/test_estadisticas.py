@@ -9,7 +9,6 @@ completo (45.432 peliculas reales). Se salta automaticamente si ese archivo
 no existe (no esta versionado, lo genera `eda dataset.ipynb`).
 """
 
-import json
 from pathlib import Path
 
 import pytest
@@ -269,12 +268,6 @@ class TestFuncionalContraDatasetReal:
     """Corre las funciones de estadisticas.py contra el catalogo real completo
     para verificar que no rompen con los tipos mixtos del dataset original y
     que los resultados son razonables."""
-
-    @classmethod
-    @pytest.fixture(scope="class")
-    def catalogo_real(cls) -> list[dict]:
-        with open(RUTA_DATASET_REAL, encoding="utf-8") as archivo:
-            return json.load(archivo)
 
     def test_promedio_general_vote_average_en_rango_valido(self, catalogo_real):
         promedio = estadisticas.promedio_general(catalogo_real, "vote_average")

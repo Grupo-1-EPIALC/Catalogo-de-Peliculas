@@ -10,9 +10,25 @@ tests de crud, busqueda, rankings y main.
 `estadisticas.py` y `recomendaciones.py` usan sus propios catalogos de
 prueba mas chicos (con valores elegidos a mano para verificar promedios
 exactos), definidos en sus propios archivos de test.
+
+`catalogo_real` carga una sola vez por sesion el dataset completo
+(data/movies_unified.json) para los tests funcionales de busqueda,
+estadisticas y recomendaciones. Cada clase que lo usa se saltea sola si el
+archivo no existe.
 """
 
+import json
+from pathlib import Path
+
 import pytest
+
+RUTA_DATASET_REAL = Path(__file__).resolve().parent.parent / "data" / "movies_unified.json"
+
+
+@pytest.fixture(scope="session")
+def catalogo_real() -> list[dict]:
+    with open(RUTA_DATASET_REAL, encoding="utf-8") as archivo:
+        return json.load(archivo)
 
 
 @pytest.fixture
