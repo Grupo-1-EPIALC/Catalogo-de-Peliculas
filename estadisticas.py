@@ -72,7 +72,7 @@ CAMPOS_NUMERICOS: list[str] = ["vote_average", "vote_count", "runtime", "revenue
 # promediarla normalizada junto al resto no tiene sentido (una pelicula mas
 # larga no es "mejor"). Su media/mediana igual se muestran (ver CAMPOS_NUMERICOS),
 # solo se excluye del combinado.
-CAMPOS_PROMEDIO_COMBINADO: list[str] = [campo for campo in CAMPOS_NUMERICOS if campo != "runtime"]
+CAMPOS_PROMEDIO_COMBINADO: list[str] = ["vote_average", "vote_count", "popularity"]
 
 
 # Parametros:
