@@ -223,5 +223,9 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Datos generados / descargados (dataset crudo, JSON unificado)
-data/
+# Datos generados / descargados (dataset crudo, JSON unificado). Se versionan
+# solo los que usa la app: el catalogo (datos.json, muestra de 1000 peliculas)
+# y los perfiles de usuario de recomendaciones.
+data/*
+!data/datos.json
+!data/perfiles_usuario.json

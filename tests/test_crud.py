@@ -60,6 +60,31 @@ class TestObtenerIdPorTitulo:
     def test_titulo_inexistente_devuelve_none(self, ruta_catalogo):
         assert crud.obtener_id_por_titulo("Pelicula Que No Existe", ruta_catalogo) is None
 
+    @pytest.mark.parametrize("titulo", ["", "   ", "!!!"])
+    def test_titulo_vacio_devuelve_none(self, ruta_catalogo, titulo):
+        assert crud.obtener_id_por_titulo(titulo, ruta_catalogo) is None
+
+    def test_ignora_tildes(self, ruta_catalogo):
+        assert crud.obtener_id_por_titulo("AMÉLIE", ruta_catalogo) == 3
+
+    def test_ignora_puntuacion_y_espacios_de_mas(self, ruta_catalogo):
+        assert crud.obtener_id_por_titulo("  seven   SAMURAI!! ", ruta_catalogo) == 4
+
+    def test_busca_tambien_por_titulo_original(self, ruta_catalogo):
+        assert crud.obtener_id_por_titulo("shichinin no samurai", ruta_catalogo) == 4
+
+    def test_titulo_parcial(self, ruta_catalogo):
+        # "Le Fabuleux Destin d'Amelie Poulain": la puntuacion se trata como espacio
+        assert crud.obtener_id_por_titulo("destin d amelie", ruta_catalogo) == 3
+
+    def test_coincidencia_exacta_le_gana_a_la_parcial(self, ruta_catalogo):
+        # "toy story" esta contenido en "Toy Story 2", pero es exacto para la 1
+        assert crud.obtener_id_por_titulo("toy story", ruta_catalogo) == 1
+        assert crud.obtener_id_por_titulo("toy story 2", ruta_catalogo) == 2
+
+    def test_entre_parciales_gana_el_titulo_mas_corto(self, ruta_catalogo):
+        assert crud.obtener_id_por_titulo("toy", ruta_catalogo) == 1
+
 
 class TestCrearPelicula:
     def test_agrega_la_pelicula_y_la_persiste(self, ruta_catalogo, catalogo_prueba):
