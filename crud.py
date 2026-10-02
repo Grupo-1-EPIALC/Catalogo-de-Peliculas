@@ -23,8 +23,10 @@ Cada "pelicula" es un dict con (entre otras) las claves:
    actualizada `list[dict]` leída desde el archivo tras la persistencia.
    esto asegura que lo devuelto refleje el estado real del archivo 
    y no un objeto en memoria que podría estar desactualizado.
-4. Función `obtener_id_por_titulo`: Permite recuperar el ID de una película a partir 
-   de su título (case-insensitive) para facilitar la usabilidad en el menú.
+4. Función `obtener_id_por_titulo`: Permite recuperar el ID de una película a partir
+   de su título para facilitar la usabilidad en el menú. La búsqueda es flexible:
+   ignora mayúsculas, tildes y puntuación, mira también `original_title` y acepta
+   títulos parciales.
 
 NUEVAS REGLAS DE DISEÑO:
 1. Separación de responsabilidades:
@@ -53,6 +55,7 @@ Funciones que contiene:
 """
 
 import json
+import unicodedata
 from env import RUTA_DATOS
 
 # Parámetros:
@@ -108,20 +111,48 @@ def obtener_pelicula_por_id(id_pelicula: int, ruta_json: str = RUTA_DATOS) -> di
 
 
 # Parámetros:
-#   titulo (str): título de la película a buscar.
+#   titulo (str): texto a normalizar.
+# Retorna:
+#   str: el texto sin mayúsculas, tildes ni puntuación, con los espacios
+#   colapsados (ej. "  Amélie: el FILM " -> "amelie el film").
+def _normalizar_titulo(titulo: str) -> str:
+    descompuesto = unicodedata.normalize("NFD", str(titulo).casefold())
+    sin_tildes = "".join(c for c in descompuesto if unicodedata.category(c) != "Mn")
+    sin_puntuacion = "".join(c if c.isalnum() else " " for c in sin_tildes)
+    return " ".join(sin_puntuacion.split())
+
+
+# Parámetros:
+#   titulo (str): título de la película a buscar (completo o parcial).
 #   ruta_json (str): ruta al archivo JSON con el catálogo.
 # Retorna:
-#   int | None: el ID de la película encontrada (coincidencia exacta case-insensitive), o None si no existe.
+#   int | None: el ID de la película encontrada, o None si no hay coincidencias.
+# Criterio de búsqueda:
+#   Compara contra `title` y `original_title`, ignorando mayúsculas, tildes,
+#   puntuación y espacios de más. Prioriza una coincidencia exacta; si no hay,
+#   acepta coincidencia parcial y devuelve la de título más corto, que es la
+#   más parecida a lo buscado (ej. "matrix" -> "The Matrix" antes que
+#   "The Matrix Reloaded"). Ante empate gana la primera del catálogo.
 def obtener_id_por_titulo(titulo: str, ruta_json: str = RUTA_DATOS) -> int | None:
-    catalogo = cargar_catalogo(ruta_json)
-    titulo_normalizado = titulo.strip().lower()
-    try:
-        pelicula = next(
-            p for p in catalogo if str(p.get("title", "")).strip().lower() == titulo_normalizado
-        )
-        return pelicula.get("id")
-    except StopIteration:
+    buscado = _normalizar_titulo(titulo)
+    if not buscado:
         return None
+
+    mejor_parcial = None
+    largo_mejor_parcial = None
+    for pelicula in cargar_catalogo(ruta_json):
+        titulos = [
+            _normalizar_titulo(pelicula.get(campo) or "") for campo in ("title", "original_title")
+        ]
+        if buscado in titulos:
+            return pelicula.get("id")
+
+        largos_parciales = [len(t) for t in titulos if buscado in t]
+        if largos_parciales and (largo_mejor_parcial is None or min(largos_parciales) < largo_mejor_parcial):
+            mejor_parcial = pelicula.get("id")
+            largo_mejor_parcial = min(largos_parciales)
+
+    return mejor_parcial
 
 
 # Parámetros:
