@@ -8,7 +8,6 @@ automaticamente si el busqueda.py local sigue siendo el stub original (ver
 real.
 """
 
-import json
 from pathlib import Path
 
 import pytest
@@ -213,12 +212,6 @@ class TestTraduccionDeCategoriasFuncional:
     """Compara, contra el dataset real completo, que buscar por el nombre en
     castellano de cada genero devuelva exactamente las mismas peliculas que
     buscar por el nombre en ingles."""
-
-    @classmethod
-    @pytest.fixture(scope="class")
-    def catalogo_real(cls) -> list[dict]:
-        with open(RUTA_DATASET_REAL, encoding="utf-8") as archivo:
-            return json.load(archivo)
 
     @pytest.mark.parametrize(
         "genero_es, genero_en",

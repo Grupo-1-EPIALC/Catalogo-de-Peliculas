@@ -12,7 +12,6 @@ implementacion REAL de busqueda.py (no la fake) y con el dataset completo.
 Se salta si busqueda.py local sigue siendo un stub, o si falta el dataset.
 """
 
-import json
 from pathlib import Path
 
 import pytest
@@ -329,12 +328,6 @@ class TestFuncionalConBusquedaYDatasetReales:
     """Igual que los tests unitarios de arriba, pero sin mockear nada:
     ejercita recomendaciones.py + busqueda.py + estadisticas.py juntos,
     contra el catalogo real completo."""
-
-    @classmethod
-    @pytest.fixture(scope="class")
-    def catalogo_real(cls) -> list[dict]:
-        with open(RUTA_DATASET_REAL, encoding="utf-8") as archivo:
-            return json.load(archivo)
 
     def test_recomendaciones_coinciden_con_las_preferencias(self, catalogo_real):
         perfil = recomendaciones.crear_perfil_usuario(
